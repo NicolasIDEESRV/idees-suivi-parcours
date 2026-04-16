@@ -23,7 +23,7 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
   ];
 
   return (
-    <div className="p-6">
+    <div className="flex flex-col min-h-full">
       {showE && (
         <EntretienForm
           salarie={salarie}
@@ -34,10 +34,12 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
         />
       )}
 
-      <button onClick={() => setPage("salaries")} className="text-sm text-gray-400 hover:text-indigo-600 mb-4">← Retour</button>
+      {/* ── Zone sticky : bouton retour + en-tête + onglets ────────────────── */}
+      <div className="sticky top-0 z-20 bg-gray-50 px-6 pt-5 pb-3 border-b border-gray-100 shadow-sm">
+        <button onClick={() => setPage("salaries")} className="text-sm text-gray-400 hover:text-indigo-600 mb-3 block">← Retour</button>
 
-      {/* En-tête salarié */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-4">
+        {/* En-tête salarié */}
+        <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
         <div className="flex items-start justify-between">
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-indigo-100 rounded-2xl flex items-center justify-center shrink-0">
@@ -101,14 +103,16 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
         </div>
       </div>
 
-      {/* Onglets */}
-      <div className="flex gap-1 mb-4 bg-white border border-gray-200 rounded-2xl p-1 w-fit">
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === t.id ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
-            {t.l}
-          </button>
-        ))}
-      </div>
+        {/* Onglets */}
+        <div className="flex gap-1 bg-white border border-gray-200 rounded-2xl p-1 w-fit">
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => setTab(t.id)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === t.id ? "bg-indigo-600 text-white" : "text-gray-600 hover:bg-gray-100"}`}>
+              {t.l}
+            </button>
+          ))}
+        </div>
+      </div>{/* ── Contenu scrollable ─────────────────────────────────────────────────── */}
+      <div className="px-6 py-5 flex-1">
 
       {/* Aperçu */}
       {tab === "apercu" && (
@@ -274,6 +278,7 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
           </Card>
         </div>
       )}
+      </div>{/* fin contenu scrollable */}
     </div>
   );
 }

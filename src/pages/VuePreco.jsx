@@ -35,7 +35,11 @@ export default function VuePreco({ user, salaries, sites, entretiens, setPage, s
         <table className="text-xs min-w-full">
           <thead className="bg-indigo-50 border-b border-indigo-100">
             <tr>
-              {headers.map(h => <th key={h} className="text-left px-3 py-2.5 font-semibold text-indigo-700 whitespace-nowrap">{h}</th>)}
+              {headers.map((h, i) => (
+                <th key={h} className={`text-left px-3 py-2.5 font-semibold text-indigo-700 whitespace-nowrap ${
+                  i === 0 ? "sticky left-0 z-10 bg-indigo-50 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.08)]" : ""
+                }`}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -45,8 +49,8 @@ export default function VuePreco({ user, salaries, sites, entretiens, setPage, s
               const dT  = daysUntil(s.titreSejour);
               const dyn = ["Dynamique","Durable","Transition"].includes(s.typeSortie);
               return (
-                <tr key={s.id} className="border-b border-gray-50 hover:bg-indigo-50 transition-colors">
-                  <td className="px-3 py-2.5">
+                <tr key={s.id} className="group border-b border-gray-50 hover:bg-indigo-50 transition-colors">
+                  <td className="sticky left-0 z-10 bg-white group-hover:bg-indigo-50 transition-colors px-3 py-2.5 shadow-[2px_0_4px_-1px_rgba(0,0,0,0.08)]">
                     <button onClick={() => { setSelectedSalarie(s); setPage("fiche"); }} className="font-semibold text-gray-900 hover:text-indigo-600 whitespace-nowrap">
                       {s.nom} {s.prenom}
                     </button>

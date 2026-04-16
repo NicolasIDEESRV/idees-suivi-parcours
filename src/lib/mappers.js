@@ -20,12 +20,13 @@ export const mapProfileFromDB = (row) => ({
 
 // ─── SITE ────────────────────────────────────────────────────────────────────
 export const mapSiteFromDB = (row) => ({
-  id:      row.id,
-  nom:     row.nom,
-  ville:   row.ville,
-  filiale: row.filiale ?? null,
-  secteur: row.secteur  ?? null,
-  actif:   row.actif,
+  id:       row.id,
+  nom:      row.nom,
+  ville:    row.ville,
+  filiale:  row.filiale  ?? null,  // Niveau 1 : ex. ID'EES R&V
+  secteur:  row.secteur  ?? null,  // Niveau 2 : ex. Tri des déchets
+  activite: row.activite ?? null,  // Niveau 3 : ex. Tri sélectif
+  actif:    row.actif,
 });
 
 // ─── SALARIÉ ─────────────────────────────────────────────────────────────────
