@@ -1,17 +1,20 @@
 import { useState } from "react";
 import { useAuth }     from "./contexts/AuthContext";
+import { AUTH_CALLBACK_TYPE } from "./lib/supabase";
 import { useAppData }  from "./hooks/useAppData";
 import Layout          from "./components/Layout";
 import JalonConfirmModal        from "./components/JalonConfirmModal";
 import FormulaireNouveauSalarie from "./components/FormulaireNouveauSalarie";
 import FormulaireSortie         from "./components/FormulaireSortie";
 import LoginPage    from "./pages/LoginPage";
+import SetPassword  from "./pages/SetPassword";
 import Dashboard    from "./pages/Dashboard";
 import Planning     from "./pages/Planning";
 import FicheSalarie from "./pages/FicheSalarie";
 import VuePreco     from "./pages/VuePreco";
 import ListeSalaries from "./pages/ListeSalaries";
 import Stats        from "./pages/Stats";
+
 
 // ─── Écran de chargement ──────────────────────────────────────────────────────
 function Loader({ message = "Chargement…" }) {
@@ -186,6 +189,17 @@ function AppInner({ user, onLogout }) {
 // ─── Racine ───────────────────────────────────────────────────────────────────
 export default function App() {
   const { user, loading, signOut } = useAuth();
+
+  // Lien d'invitation cliqué → afficher le formulaire "définir mon mot de passe"
+  if (AUTH_CALLBACK_TYPE) {
+    return (
+      <SetPassword onDone={() => {
+        // Nettoie le hash et recharge l'app normalement
+        window.history.replaceState(null, "", window.location.pathname);
+        window.location.reload();
+      }} />
+    );
+  }
 
   // Chargement Auth initial (vérification de la session persistée)
   if (loading) return <Loader />;
