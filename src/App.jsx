@@ -14,6 +14,7 @@ import FicheSalarie from "./pages/FicheSalarie";
 import VuePreco     from "./pages/VuePreco";
 import ListeSalaries from "./pages/ListeSalaries";
 import Stats        from "./pages/Stats";
+import Admin        from "./pages/Admin";
 
 
 // ─── Écran de chargement ──────────────────────────────────────────────────────
@@ -181,6 +182,9 @@ function AppInner({ user, onLogout }) {
       )}
       {page === "stats" && (
         <Stats user={user} salaries={salaries} />
+      )}
+      {page === "admin" && (
+        <Admin user={user} sites={sites} />
       )}
     </Layout>
   );
