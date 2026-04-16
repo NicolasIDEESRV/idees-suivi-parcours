@@ -18,12 +18,14 @@ export const mapProfileFromDB = (row) => ({
   actif:     row.actif,
 });
 
-// ─── SITE (filiale) ──────────────────────────────────────────────────────────
+// ─── SITE ────────────────────────────────────────────────────────────────────
 export const mapSiteFromDB = (row) => ({
-  id:    row.id,
-  nom:   row.nom,
-  ville: row.ville,
-  actif: row.actif,
+  id:      row.id,
+  nom:     row.nom,
+  ville:   row.ville,
+  filiale: row.filiale ?? null,
+  secteur: row.secteur  ?? null,
+  actif:   row.actif,
 });
 
 // ─── SALARIÉ ─────────────────────────────────────────────────────────────────
