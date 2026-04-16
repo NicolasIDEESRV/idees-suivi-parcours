@@ -42,7 +42,11 @@ export function AuthProvider({ children }) {
       .then(setProfile)
       .catch(err => {
         console.error("Erreur chargement profil :", err.message);
-        setAuthError(err.message);
+        // PGRST116 = aucune ligne trouvée (profil pas encore créé par l'admin)
+        const msg = err.code === "PGRST116"
+          ? "Votre compte n'a pas encore de profil configuré. Contactez votre administrateur."
+          : (err.message ?? "Erreur de chargement du profil.");
+        setAuthError(msg);
       })
       .finally(() => setLoadingProfile(false));
   }, [session?.user?.id]);

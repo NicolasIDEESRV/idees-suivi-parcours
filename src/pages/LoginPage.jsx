@@ -4,7 +4,7 @@ import { LOGOS } from "../lib/logos";
 import { FInput } from "../components/ui";
 
 export default function LoginPage() {
-  const { signIn } = useAuth();
+  const { signIn, authError } = useAuth();
   const [email, setEmail] = useState("");
   const [pw,    setPw]    = useState("");
   const [err,   setErr]   = useState("");
@@ -51,8 +51,8 @@ export default function LoginPage() {
             onKeyDown={e => e.key === "Enter" && go()}
             autoComplete="current-password"
           />
-          {err && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>
+          {(err || authError) && (
+            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err || authError}</p>
           )}
           <button
             onClick={go}
