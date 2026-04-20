@@ -185,7 +185,7 @@ function AppInner({ user, onLogout }) {
         />
       )}
       {page === "stats" && (
-        <Stats user={user} salaries={salaries} />
+        <Stats user={user} salaries={salaries} sites={sites} />
       )}
       {page === "admin" && (
         <Admin user={user} sites={sites} />
