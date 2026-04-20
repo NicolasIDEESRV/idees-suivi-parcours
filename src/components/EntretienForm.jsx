@@ -31,7 +31,7 @@ export default function EntretienForm({ salarie, initial, objectifsExistants, us
   const updRevue = (id, k, v) => setObjRevue(prev => prev.map(o => o.id === id ? { ...o, [k]: v } : o));
 
   const handleSave = () => {
-    onSave({ id: initial?.id || "e" + Date.now(), salarie_id: salarie.id, ...form, objectifsRevus: objRevue });
+    onSave({ ...form, id: initial?.id || null, salarie_id: salarie.id, objectifsRevus: objRevue });
   };
 
   return (
