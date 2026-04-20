@@ -40,6 +40,7 @@ export const mapSalarieFromDB = (row) => ({
   // État civil
   nom:            row.nom,
   prenom:         row.prenom,
+  nomNaissance:   row.nom_naissance   ?? "",
   dateNaissance:  row.date_naissance  ?? "",
   sexe:           row.sexe            ?? "",
   nationalite:    row.nationalite     ?? "Française",
@@ -80,17 +81,18 @@ export const mapSalarieFromDB = (row) => ({
   heuresTravaillees: row.heures_travaillees ?? 0,
 
   // Formation & compétences
-  niveauFormation: row.niveau_formation ?? "Niveau 3 (CAP/BEP et moins)",
-  cv:              row.cv               ?? false,
-  niveauLangue:    row.niveau_langue    ?? "A1",
-  niveauScolaire:  row.niveaux_scolaire ?? "",
-  lecture:         row.lecture          ?? false,
-  ecriture:        row.ecriture         ?? false,
-  calcul:          row.calcul           ?? false,
-  diplomes:        row.diplomes         ?? "",
-  formations:      row.formations       ?? "",
-  equipementInfo:  row.equipement_info  ?? "",
-  accesInternet:   row.acces_internet   ?? false,
+  niveauFormation:  row.niveau_formation ?? "Niveau 3 (CAP/BEP et moins)",
+  cv:               row.cv               ?? false,
+  niveauLangue:     row.niveau_langue    ?? "A1",
+  niveauScolaire:   row.niveaux_scolaire ?? "",
+  lecture:          row.lecture          ?? false,
+  ecriture:         row.ecriture         ?? false,
+  calcul:           row.calcul           ?? false,
+  diplomes:         row.diplomes         ?? "",
+  formations:       row.formations       ?? "",
+  experiencesPro:   row.experiences_pro  ?? "",
+  equipementInfo:   row.equipement_info  ?? "",
+  accesInternet:    row.acces_internet   ?? false,
 
   // Projet professionnel
   projetPro:    row.projet_pro    ?? "",
@@ -102,6 +104,7 @@ export const mapSalarieFromDB = (row) => ({
   nbEnfants:         row.nb_enfants         ?? 0,
   ageEnfants:        row.age_enfants        ?? "",
   modeGarde:         row.mode_garde         ?? "",
+  personnesCharge:   row.personnes_charge   ?? "",
   hebergement:       row.hebergement        ?? "",
   demarche:          row.demarche           ?? "",
   sports:            row.sports             ?? "",
@@ -114,6 +117,7 @@ export const mapSalarieFromDB = (row) => ({
   restrictions:    row.restrictions     ?? "",
   traitement:      row.traitement       ?? "",
   addictions:      row.addictions       ?? "",
+  autresSante:     row.autres_sante     ?? "",
 
   // Ressources
   revenus:  row.revenus  ?? 0,
@@ -123,6 +127,7 @@ export const mapSalarieFromDB = (row) => ({
   // Mobilité
   permisB:        row.permis_b        ?? false,
   vehicule:       row.vehicule        ?? false,
+  autresPermis:   row.autres_permis   ?? "",
   moyenTransport: row.moyen_transport ?? "",
   deplacements:   row.deplacements    ?? "",
 
@@ -139,6 +144,9 @@ export const mapSalarieFromDB = (row) => ({
   accordTransmission: row.accord_transmission  ?? false,
   aRappeler:          row.a_rappeler           ?? false,
 
+  // Rappel post-sortie
+  rappelJusquAu: row.rappel_jusqu_au ?? "",
+
   // Synthèses
   synthBesoinsEntree: row.synth_besoins_entree ?? "",
   synthBesoinsSortie: row.synth_besoins_sortie ?? "",
@@ -152,6 +160,7 @@ export const mapSalarieToDB = (obj) => ({
 
   nom:             obj.nom,
   prenom:          obj.prenom,
+  nom_naissance:   obj.nomNaissance   || null,
   date_naissance:  obj.dateNaissance  || null,
   sexe:            obj.sexe           || null,
   nationalite:     obj.nationalite    || "Française",
@@ -196,6 +205,7 @@ export const mapSalarieToDB = (obj) => ({
   calcul:           obj.calcul          ?? false,
   diplomes:         obj.diplomes        || null,
   formations:       obj.formations      || null,
+  experiences_pro:  obj.experiencesPro  || null,
   equipement_info:  obj.equipementInfo  || null,
   acces_internet:   obj.accesInternet   ?? false,
 
@@ -207,6 +217,7 @@ export const mapSalarieToDB = (obj) => ({
   nb_enfants:         obj.nbEnfants         ?? 0,
   age_enfants:        obj.ageEnfants        || null,
   mode_garde:         obj.modeGarde         || null,
+  personnes_charge:   obj.personnesCharge   || null,
   hebergement:        obj.hebergement       || null,
   demarche:           obj.demarche          || null,
   sports:             obj.sports            || null,
@@ -218,6 +229,7 @@ export const mapSalarieToDB = (obj) => ({
   restrictions:     obj.restrictions     || null,
   traitement:       obj.traitement       || null,
   addictions:       obj.addictions       || null,
+  autres_sante:     obj.autresSante      || null,
 
   revenus:  obj.revenus  ?? 0,
   charges:  obj.charges  ?? 0,
@@ -225,6 +237,7 @@ export const mapSalarieToDB = (obj) => ({
 
   permis_b:        obj.permisB        ?? false,
   vehicule:        obj.vehicule       ?? false,
+  autres_permis:   obj.autresPermis   || null,
   moyen_transport: obj.moyenTransport || null,
   deplacements:    obj.deplacements   || null,
 
@@ -238,6 +251,8 @@ export const mapSalarieToDB = (obj) => ({
   accord_suivi_post:   obj.accordSuiviPost     ?? false,
   accord_transmission: obj.accordTransmission  ?? false,
   a_rappeler:          obj.aRappeler           ?? false,
+
+  rappel_jusqu_au:      obj.rappelJusquAu      || null,
 
   synth_besoins_entree: obj.synthBesoinsEntree || null,
   synth_besoins_sortie: obj.synthBesoinsSortie || null,

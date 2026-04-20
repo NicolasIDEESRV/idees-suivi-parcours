@@ -46,20 +46,35 @@ export async function updateSalarie(id, form) {
 }
 
 /**
- * Enregistre la sortie d'un salarié (met à jour date_sortie + champs bilan).
+ * Enregistre la sortie d'un salarié :
+ * - Met à jour date_sortie + champs bilan
+ * - Calcule rappel_jusqu_au = date_sortie + 3 mois
+ * - Supprime tous les entretiens futurs (date > date_sortie) via RPC
  */
 export async function sortirSalarie(id, sortieForm) {
+  const dateSortie = sortieForm.dateSortie || null;
+
+  // Calculer la date limite du rappel (sortie + 3 mois)
+  let rappelJusquAu = null;
+  if (dateSortie && sortieForm.aRappeler) {
+    const d = new Date(dateSortie);
+    d.setMonth(d.getMonth() + 3);
+    rappelJusquAu = d.toISOString().split("T")[0];
+  }
+
   const payload = {
-    date_sortie:         sortieForm.dateSortie         || null,
-    type_sortie:         sortieForm.typeSortie         || null,
-    situation_sortie:    sortieForm.situationSortie     || null,
-    accord_suivi_post:   sortieForm.accordSuiviPost     ?? false,
-    accord_transmission: sortieForm.accordTransmission  ?? false,
-    a_rappeler:          sortieForm.aRappeler           ?? false,
-    synth_besoins_sortie: sortieForm.synthBesoinsSortie || null,
-    synth_parcours:       sortieForm.synthParcours      || null,
-    freins_sortie:        sortieForm.freinsSortie       ?? {},
+    date_sortie:          dateSortie,
+    type_sortie:          sortieForm.typeSortie         || null,
+    situation_sortie:     sortieForm.situationSortie     || null,
+    accord_suivi_post:    sortieForm.accordSuiviPost     ?? false,
+    accord_transmission:  sortieForm.accordTransmission  ?? false,
+    a_rappeler:           sortieForm.aRappeler           ?? false,
+    rappel_jusqu_au:      rappelJusquAu,
+    synth_besoins_sortie: sortieForm.synthBesoinsSortie  || null,
+    synth_parcours:       sortieForm.synthParcours       || null,
+    freins_sortie:        sortieForm.freinsSortie        ?? {},
   };
+
   const { data, error } = await supabase
     .from("salaries")
     .update(payload)
@@ -67,5 +82,23 @@ export async function sortirSalarie(id, sortieForm) {
     .select()
     .single();
   if (error) throw error;
+
+  // Supprimer les entretiens futurs (après date de sortie)
+  if (dateSortie) {
+    await supabase.rpc("nettoyer_echeances_sortie", {
+      p_salarie_id: id,
+      p_date_sortie: dateSortie,
+    });
+  }
+
   return mapSalarieFromDB(data);
+}
+
+/**
+ * Supprime définitivement un salarié et toutes ses données (admin uniquement).
+ * La suppression en cascade (entretiens, objectifs) est gérée par la DB.
+ */
+export async function deleteSalarie(id) {
+  const { error } = await supabase.rpc("supprimer_salarie", { p_salarie_id: id });
+  if (error) throw error;
 }

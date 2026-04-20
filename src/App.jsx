@@ -46,7 +46,7 @@ function AppInner({ user, onLogout }) {
   const {
     sites, profiles, salaries, entretiens,
     loading, error,
-    handleSaveSal, handleConfirmJalons, handleSortie, handleSaveEntretien,
+    handleSaveSal, handleConfirmJalons, handleSortie, handleDeleteSalarie, handleSaveEntretien,
     reload,
   } = useAppData(user);
 
@@ -178,6 +178,10 @@ function AppInner({ user, onLogout }) {
           onEdit={s => setEditSal(s)}
           onAddEntretien={onSaveEntretien}
           onOpenSortie={setSortSal}
+          onDelete={async (id) => {
+            await handleDeleteSalarie(id);
+            navigate("salaries");
+          }}
         />
       )}
       {page === "stats" && (

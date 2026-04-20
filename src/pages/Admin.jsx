@@ -322,11 +322,98 @@ function UserManagement({ sites }) {
   );
 }
 
+// ─── Sélecteur hiérarchique filiale → secteur → activité → site ──────────────
+function SiteHierarchyPicker({ sites, value, onChange }) {
+  // Construire la hiérarchie unique depuis les sites disponibles
+  const filialesList = [...new Set(sites.map(s => s.filiale).filter(Boolean))];
+
+  const [filiale,  setFiliale]  = useState(() => sites.find(s => s.id === value)?.filiale ?? "");
+  const [secteur,  setSecteur]  = useState(() => sites.find(s => s.id === value)?.secteur ?? "");
+  const [activite, setActivite] = useState(() => sites.find(s => s.id === value)?.activite ?? "");
+
+  // Listes filtrées selon la sélection en cours
+  const secteursList = [...new Set(
+    sites.filter(s => !filiale || s.filiale === filiale).map(s => s.secteur).filter(Boolean)
+  )];
+  const activitesList = [...new Set(
+    sites.filter(s => (!filiale || s.filiale === filiale) && (!secteur || s.secteur === secteur))
+      .map(s => s.activite).filter(Boolean)
+  )];
+  const sitesFiltres = sites.filter(s =>
+    (!filiale  || s.filiale  === filiale)  &&
+    (!secteur  || s.secteur  === secteur)  &&
+    (!activite || s.activite === activite)
+  );
+
+  const pick = (field, val) => {
+    if (field === "filiale")  { setFiliale(val); setSecteur(""); setActivite(""); onChange(""); }
+    if (field === "secteur")  { setSecteur(val); setActivite(""); onChange(""); }
+    if (field === "activite") { setActivite(val); onChange(""); }
+    if (field === "site")     { onChange(val); }
+  };
+
+  const Chip = ({ label, active, onClick }) => (
+    <button type="button" onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
+        active ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+      }`}
+    >{label}</button>
+  );
+
+  return (
+    <div className="space-y-3">
+      {/* Filiale */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Filiale</p>
+        <div className="flex flex-wrap gap-2">
+          <Chip label="Toutes" active={!filiale} onClick={() => pick("filiale", "")} />
+          {filialesList.map(f => <Chip key={f} label={f} active={filiale === f} onClick={() => pick("filiale", f)} />)}
+        </div>
+      </div>
+
+      {/* Secteur */}
+      {secteursList.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Secteur</p>
+          <div className="flex flex-wrap gap-2">
+            <Chip label="Tous" active={!secteur} onClick={() => pick("secteur", "")} />
+            {secteursList.map(s => <Chip key={s} label={s} active={secteur === s} onClick={() => pick("secteur", s)} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Activité */}
+      {activitesList.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Activité</p>
+          <div className="flex flex-wrap gap-2">
+            <Chip label="Toutes" active={!activite} onClick={() => pick("activite", "")} />
+            {activitesList.map(a => <Chip key={a} label={a} active={activite === a} onClick={() => pick("activite", a)} />)}
+          </div>
+        </div>
+      )}
+
+      {/* Site final */}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+          Site {sitesFiltres.length > 1 ? `(${sitesFiltres.length} disponibles)` : ""}
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {sitesFiltres.map(s => (
+            <Chip key={s.id} label={`${s.nom} — ${s.ville}`} active={value === s.id} onClick={() => pick("site", s.id)} />
+          ))}
+          {sitesFiltres.length === 0 && <p className="text-xs text-gray-400 italic">Aucun site correspondant</p>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Onglet Invitations ───────────────────────────────────────────────────────
 function InviteForm({ sites }) {
   const [email,   setEmail]   = useState("");
   const [role,    setRole]    = useState("cip");
-  const [siteId,  setSiteId]  = useState(sites[0]?.id ?? "");
+  const [siteId,  setSiteId]  = useState("");
   const [loading, setLoading] = useState(false);
   const [msg,     setMsg]     = useState(null);
 
@@ -347,17 +434,14 @@ function InviteForm({ sites }) {
             "Authorization": `Bearer ${session.access_token}`,
             "apikey":        import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({
-            email:   email.trim(),
-            role,
-            site_id: role === "cip" ? siteId : null,
-          }),
+          body: JSON.stringify({ email: email.trim(), role, site_id: role === "cip" ? siteId : null }),
         }
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
       setMsg({ type: "success", text: `Invitation envoyée à ${email.trim()}.` });
       setEmail("");
+      setSiteId("");
     } catch (e) {
       setMsg({ type: "error", text: e.message });
     } finally {
@@ -368,71 +452,59 @@ function InviteForm({ sites }) {
   const selectedSite = sites.find(s => s.id === siteId);
 
   return (
-    <div className="max-w-lg space-y-6">
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+    <div className="max-w-xl space-y-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
         <h2 className="text-sm font-semibold text-gray-700">Envoyer une invitation</h2>
 
-        <FInput
-          label="Adresse email"
-          required
-          type="email"
-          value={email}
+        <FInput label="Adresse email" required type="email" value={email}
           onChange={e => setEmail(e.target.value)}
           onKeyDown={e => e.key === "Enter" && send()}
           placeholder="prenom.nom@idees.fr"
         />
 
-        <FSelect label="Rôle" required value={role} onChange={e => setRole(e.target.value)}>
-          {ROLES.map(r => (
-            <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>
-          ))}
+        <FSelect label="Rôle" required value={role} onChange={e => { setRole(e.target.value); setSiteId(""); }}>
+          {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
         </FSelect>
 
+        {/* Sélection hiérarchique pour CIP */}
         {role === "cip" && (
-          <FSelect label="Site" required value={siteId} onChange={e => setSiteId(e.target.value)}>
-            <option value="">— Sélectionner un site —</option>
-            {sites.map(s => (
-              <option key={s.id} value={s.id}>{s.nom}</option>
-            ))}
-          </FSelect>
+          <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              Sélection du site d'affectation
+            </p>
+            <SiteHierarchyPicker sites={sites} value={siteId} onChange={setSiteId} />
+          </div>
         )}
 
         {/* Récapitulatif */}
-        {email && (
-          <div className="bg-gray-50 rounded-xl p-3 text-xs text-gray-600 space-y-1">
+        {email && (role !== "cip" || siteId) && (
+          <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-800 space-y-1 border border-indigo-100">
+            <p className="font-semibold mb-1">Récapitulatif de l'invitation</p>
             <p><span className="font-medium">Email :</span> {email}</p>
             <p><span className="font-medium">Rôle :</span> <RoleBadge role={role} /></p>
-            {role === "cip" && selectedSite && (
+            {selectedSite && (
               <>
-                <p><span className="font-medium">Filiale :</span> {selectedSite.filiale ?? "—"}</p>
-                <p><span className="font-medium">Site :</span> {selectedSite.nom}</p>
-                {selectedSite.secteur && (
-                  <p><span className="font-medium">Secteur :</span> {selectedSite.secteur}</p>
-                )}
+                {selectedSite.filiale  && <p><span className="font-medium">Filiale :</span> {selectedSite.filiale}</p>}
+                {selectedSite.secteur  && <p><span className="font-medium">Secteur :</span> {selectedSite.secteur}</p>}
+                {selectedSite.activite && <p><span className="font-medium">Activité :</span> {selectedSite.activite}</p>}
+                <p><span className="font-medium">Site :</span> {selectedSite.nom} ({selectedSite.ville})</p>
               </>
             )}
           </div>
         )}
 
         {msg && (
-          <p className={`text-sm rounded-lg px-3 py-2 ${
-            msg.type === "success" ? "text-green-700 bg-green-50" : "text-red-600 bg-red-50"
-          }`}>
+          <p className={`text-sm rounded-lg px-3 py-2 ${msg.type === "success" ? "text-green-700 bg-green-50" : "text-red-600 bg-red-50"}`}>
             {msg.text}
           </p>
         )}
 
-        <button
-          onClick={send}
-          disabled={loading}
+        <button onClick={send} disabled={loading}
           className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold py-3 rounded-xl text-sm transition-colors"
         >
           {loading ? "Envoi en cours…" : "Envoyer l'invitation"}
         </button>
-
-        <p className="text-xs text-gray-400 text-center">
-          Le rôle est verrouillé à l'envoi — l'invité ne peut pas le modifier.
-        </p>
+        <p className="text-xs text-gray-400 text-center">Le rôle est verrouillé à l'envoi — l'invité ne peut pas le modifier.</p>
       </div>
     </div>
   );

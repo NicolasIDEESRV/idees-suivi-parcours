@@ -5,7 +5,7 @@ import { fC } from "../lib/theme";
 import { Card, Row } from "../components/ui";
 import EntretienForm from "../components/EntretienForm";
 
-export default function FicheSalarie({ salarie, entretiens, user, users, setPage, onEdit, onAddEntretien, onOpenSortie }) {
+export default function FicheSalarie({ salarie, entretiens, user, users, setPage, onEdit, onAddEntretien, onOpenSortie, onDelete }) {
   const [tab,   setTab]   = useState("apercu");
   const [showE, setShowE] = useState(false);
 
@@ -59,10 +59,23 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
               </div>
             </div>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0 flex-wrap">
             <button onClick={() => onEdit(salarie)} className="text-sm text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-3 py-2 rounded-xl">✏ Modifier</button>
             <button onClick={() => setShowE(true)}  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl">+ Entretien</button>
             {!salarie.dateSortie && <button onClick={() => onOpenSortie(salarie)} className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl">Sortir</button>}
+            {user.role === "admin" && (
+              <button
+                onClick={() => {
+                  if (window.confirm(`Supprimer définitivement ${salarie.nom} ${salarie.prenom} ? Cette action est irréversible et supprimera aussi tous ses entretiens et objectifs.`)) {
+                    onDelete(salarie.id);
+                  }
+                }}
+                className="text-sm text-gray-400 hover:text-red-600 border border-gray-200 hover:border-red-200 hover:bg-red-50 px-3 py-2 rounded-xl transition-colors"
+                title="Supprimer le salarié (admin)"
+              >
+                🗑
+              </button>
+            )}
           </div>
         </div>
 

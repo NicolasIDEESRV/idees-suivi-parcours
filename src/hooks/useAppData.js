@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { getSites }       from "../lib/api/sites";
 import { getProfiles }    from "../lib/api/profiles";
-import { getSalaries, createSalarie, updateSalarie, sortirSalarie } from "../lib/api/salaries";
+import { getSalaries, createSalarie, updateSalarie, sortirSalarie, deleteSalarie } from "../lib/api/salaries";
 import { getEntretiens, saveEntretien, createJalons, confirmJalons } from "../lib/api/entretiens";
 import { genJalons }      from "../lib/data";        // génère les jalons locaux avant persistance
 import { supabase }       from "../lib/supabase";
@@ -145,6 +145,16 @@ export function useAppData(user) {
   };
 
   /**
+   * Supprime définitivement un salarié (admin uniquement).
+   * La cascade DB supprime aussi ses entretiens et objectifs.
+   */
+  const handleDeleteSalarie = async (salarieId) => {
+    await deleteSalarie(salarieId);
+    setSalaries(prev => prev.filter(s => s.id !== salarieId));
+    setEntretiens(prev => prev.filter(e => e.salarie_id !== salarieId));
+  };
+
+  /**
    * Crée ou met à jour un entretien (+ ses objectifs + révisions).
    */
   const handleSaveEntretien = async (entretien) => {
@@ -170,6 +180,7 @@ export function useAppData(user) {
     handleSaveSal,
     handleConfirmJalons,
     handleSortie,
+    handleDeleteSalarie,
     handleSaveEntretien,
     // Utilitaire
     reload: loadAll,
