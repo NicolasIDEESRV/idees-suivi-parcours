@@ -287,8 +287,8 @@ export const mapEntretienFromDB = (row) => ({
 /** Objet JS → payload DB entretien (sans objectifs, gérés séparément) */
 export const mapEntretienToDB = (obj) => ({
   salarie_id:  obj.salarie_id,
-  cip_id:      obj.cip_id,
-  assigned_to: obj.assignedTo,
+  cip_id:      obj.cip_id || obj.assignedTo || null,
+  assigned_to: obj.assignedTo || obj.cip_id || null,
 
   date:         obj.date         || null,
   type:         obj.type         || null,
