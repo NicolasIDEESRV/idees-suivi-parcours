@@ -170,14 +170,15 @@ export default function Stats({ user, salaries, sites = [] }) {
   const now = new Date().getFullYear();
 
   // ── Filtres ──────────────────────────────────────────────────────────────────
-  const [selFilialeS, setSelFilialeS] = useState([]);
-  const [selSecteurS, setSelSecteurS] = useState([]);
+  const [selFilialeS,  setSelFilialeS]  = useState([]);
+  const [selSecteurS,  setSelSecteurS]  = useState([]);
   const [selActiviteS, setSelActiviteS] = useState([]);
+  const [selSiteS,     setSelSiteS]     = useState([]);
   const [periodFrom, setPeriodFrom]   = useState(`${now}-01-01`);
   const [periodTo,   setPeriodTo]     = useState(`${now}-12-31`);
   const [modeVue,    setModeVue]      = useState("inscrits"); // inscrits | sortis | tous
 
-  // Hiérarchie disponible depuis les sites
+  // Hiérarchie disponible depuis les sites (cascadée)
   const filialesList  = [...new Set(sites.map(s => s.filiale).filter(Boolean))].sort();
   const secteursList  = [...new Set(
     sites.filter(s => selFilialeS.length === 0 || selFilialeS.includes(s.filiale))
@@ -185,20 +186,29 @@ export default function Stats({ user, salaries, sites = [] }) {
   )].sort();
   const activitesList = [...new Set(
     sites.filter(s =>
-      (selFilialeS.length  === 0 || selFilialeS.includes(s.filiale)) &&
-      (selSecteurS.length  === 0 || selSecteurS.includes(s.secteur))
+      (selFilialeS.length === 0 || selFilialeS.includes(s.filiale)) &&
+      (selSecteurS.length === 0 || selSecteurS.includes(s.secteur))
     ).map(s => s.activite).filter(Boolean)
+  )].sort();
+  const sitesList = [...new Set(
+    sites.filter(s =>
+      (selFilialeS.length  === 0 || selFilialeS.includes(s.filiale))  &&
+      (selSecteurS.length  === 0 || selSecteurS.includes(s.secteur))  &&
+      (selActiviteS.length === 0 || selActiviteS.includes(s.activite))
+    ).map(s => s.nom).filter(Boolean)
   )].sort();
 
   // IDs des sites correspondant aux filtres hiérarchiques
   const filteredSiteIds = useMemo(() => {
-    if (selFilialeS.length === 0 && selSecteurS.length === 0 && selActiviteS.length === 0) return null; // tout
+    const noFilter = selFilialeS.length === 0 && selSecteurS.length === 0 && selActiviteS.length === 0 && selSiteS.length === 0;
+    if (noFilter) return null; // tout
     return sites.filter(s =>
-      (selFilialeS.length  === 0 || selFilialeS.includes(s.filiale)) &&
-      (selSecteurS.length  === 0 || selSecteurS.includes(s.secteur)) &&
-      (selActiviteS.length === 0 || selActiviteS.includes(s.activite))
+      (selFilialeS.length  === 0 || selFilialeS.includes(s.filiale))  &&
+      (selSecteurS.length  === 0 || selSecteurS.includes(s.secteur))  &&
+      (selActiviteS.length === 0 || selActiviteS.includes(s.activite)) &&
+      (selSiteS.length     === 0 || selSiteS.includes(s.nom))
     ).map(s => s.id);
-  }, [sites, selFilialeS, selSecteurS, selActiviteS]);
+  }, [sites, selFilialeS, selSecteurS, selActiviteS, selSiteS]);
 
   // ── Filtrage de la liste principale ──────────────────────────────────────────
   const allFiltered = useMemo(() => {
@@ -317,21 +327,28 @@ export default function Stats({ user, salaries, sites = [] }) {
           {filialesList.length > 0 && (
             <CheckGroup label="Filiale" options={filialesList}
               selected={selFilialeS}
-              onChange={v => { setSelFilialeS(v); setSelSecteurS([]); setSelActiviteS([]); }}
+              onChange={v => { setSelFilialeS(v); setSelSecteurS([]); setSelActiviteS([]); setSelSiteS([]); }}
             />
           )}
           {/* Secteur */}
           {secteursList.length > 0 && (
             <CheckGroup label="Secteur" options={secteursList}
               selected={selSecteurS}
-              onChange={v => { setSelSecteurS(v); setSelActiviteS([]); }}
+              onChange={v => { setSelSecteurS(v); setSelActiviteS([]); setSelSiteS([]); }}
             />
           )}
           {/* Activité */}
           {activitesList.length > 0 && (
             <CheckGroup label="Activité" options={activitesList}
               selected={selActiviteS}
-              onChange={setSelActiviteS}
+              onChange={v => { setSelActiviteS(v); setSelSiteS([]); }}
+            />
+          )}
+          {/* Site */}
+          {sitesList.length > 1 && (
+            <CheckGroup label="Site" options={sitesList}
+              selected={selSiteS}
+              onChange={setSelSiteS}
             />
           )}
           {/* Période */}

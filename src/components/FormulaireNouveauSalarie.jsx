@@ -54,7 +54,12 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
               <FInput label="Référent prescripteur" value={form.nomPrenomPrescripteur} onChange={e => upd("nomPrenomPrescripteur", e.target.value)} />
               {user.role === "admin" && (
                 <FSelect label="Site" value={form.site_id} onChange={e => upd("site_id", e.target.value)}>
-                  {sites.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+                  <option value="">— Sélectionner un site —</option>
+                  {sites.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
+                    </option>
+                  ))}
                 </FSelect>
               )}
               <FSec>Publics prioritaires</FSec>

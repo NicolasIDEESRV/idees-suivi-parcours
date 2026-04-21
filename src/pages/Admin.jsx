@@ -182,22 +182,23 @@ function ByRole({ profiles, sites, onRefresh }) {
 
 // ─── Vue par filiale ──────────────────────────────────────────────────────────
 function ByFiliale({ profiles, sites, onRefresh }) {
-  // Grouper les sites par filiale
+  // Grouper : filiale → secteur → activite → sites[]
   const filialeMap = {};
   sites.forEach(s => {
-    const key = s.filiale ?? s.nom;
-    if (!filialeMap[key]) filialeMap[key] = { filiale: key, secteurs: {} };
-    const sec = s.secteur ?? "—";
-    if (!filialeMap[key].secteurs[sec]) filialeMap[key].secteurs[sec] = [];
-    filialeMap[key].secteurs[sec].push(s);
+    const fil = s.filiale ?? s.nom;
+    const sec = s.secteur  ?? "—";
+    const act = s.activite ?? "—";
+    if (!filialeMap[fil]) filialeMap[fil] = {};
+    if (!filialeMap[fil][sec]) filialeMap[fil][sec] = {};
+    if (!filialeMap[fil][sec][act]) filialeMap[fil][sec][act] = [];
+    filialeMap[fil][sec][act].push(s);
   });
 
-  // Admin / Direction = accès cross-site → groupe séparé
   const crossSite = profiles.filter(p => p.role !== "cip");
 
   return (
     <div className="space-y-10">
-      {/* Utilisateurs sans site (admin / direction) */}
+      {/* Admin / Direction */}
       {crossSite.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-3">
@@ -205,50 +206,52 @@ function ByFiliale({ profiles, sites, onRefresh }) {
             <span className="text-xs text-gray-400">(Admin + Direction)</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {crossSite.map(p => (
-              <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />
-            ))}
+            {crossSite.map(p => <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />)}
           </div>
         </section>
       )}
 
-      {/* Par filiale → secteur → site */}
-      {Object.values(filialeMap).map(({ filiale, secteurs }) => (
+      {/* Filiale → Secteur → Activité → Site */}
+      {Object.entries(filialeMap).map(([filiale, secteurs]) => (
         <section key={filiale}>
           <h3 className="text-sm font-bold text-gray-800 mb-4 flex items-center gap-2">
             <span className="w-2 h-2 rounded-full bg-indigo-400 inline-block" />
             Filiale — {filiale}
           </h3>
 
-          {Object.entries(secteurs).map(([secteur, sitesList]) => {
-            const siteIds = sitesList.map(s => s.id);
-            const cipsSite = profiles.filter(p => p.role === "cip" && siteIds.includes(p.site_id));
+          {Object.entries(secteurs).map(([secteur, activites]) => (
+            <div key={secteur} className="ml-4 mb-6">
+              <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wide mb-2">
+                Secteur — {secteur}
+              </p>
 
-            return (
-              <div key={secteur} className="ml-4 mb-6">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                  Secteur — {secteur}
-                </p>
-                {sitesList.map(site => {
-                  const cipsSite2 = profiles.filter(p => p.role === "cip" && p.site_id === site.id);
-                  return (
-                    <div key={site.id} className="ml-4 mb-4">
-                      <p className="text-xs text-gray-500 mb-2 font-medium">{site.nom} ({site.ville})</p>
-                      {cipsSite2.length === 0 ? (
-                        <p className="text-xs text-gray-300 italic pl-1">Aucun CIP</p>
-                      ) : (
-                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                          {cipsSite2.map(p => (
-                            <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
+              {Object.entries(activites).map(([activite, sitesList]) => (
+                <div key={activite} className="ml-4 mb-4">
+                  <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                    Activité — {activite}
+                  </p>
+
+                  {sitesList.map(site => {
+                    const cips = profiles.filter(p => p.role === "cip" && p.site_id === site.id);
+                    return (
+                      <div key={site.id} className="ml-4 mb-3">
+                        <p className="text-xs text-gray-500 font-medium mb-2">
+                          Site — {site.nom}{site.ville ? ` (${site.ville})` : ""}
+                        </p>
+                        {cips.length === 0 ? (
+                          <p className="text-xs text-gray-300 italic pl-1">Aucun CIP</p>
+                        ) : (
+                          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                            {cips.map(p => <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />)}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              ))}
+            </div>
+          ))}
         </section>
       ))}
     </div>
