@@ -12,8 +12,8 @@ SET
   nom      = 'FIRMINY',
   ville    = 'Firminy',
   filiale  = 'ID''EES R&V',
-  secteur  = 'Tri des déchets ménagers recyclables',
-  activite = 'Tri des déchets ménagers recyclables'
+  secteur  = 'Recyclage & Valorisation',
+  activite = 'Recyclage & Valorisation'
 WHERE id = '00000000-0000-0000-0000-000000000001';
 
 -- ── 3. Ajouter DIJON et PONTARLIER pour ID'EES R&V ───────────────────────────
@@ -23,16 +23,16 @@ VALUES
     '00000000-0000-0000-0000-000000000002',
     'DIJON', 'Dijon',
     'ID''EES R&V',
-    'Tri des déchets ménagers recyclables',
-    'Tri des déchets ménagers recyclables',
+    'Recyclage & Valorisation',
+    'Recyclage & Valorisation',
     true
   ),
   (
     '00000000-0000-0000-0000-000000000003',
     'PONTARLIER', 'Pontarlier',
     'ID''EES R&V',
-    'Tri des déchets ménagers recyclables',
-    'Tri des déchets ménagers recyclables',
+    'Recyclage & Valorisation',
+    'Recyclage & Valorisation',
     true
   )
 ON CONFLICT (id) DO UPDATE SET
