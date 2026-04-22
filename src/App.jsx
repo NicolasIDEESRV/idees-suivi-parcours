@@ -148,7 +148,7 @@ function AppInner({ user, onLogout }) {
       {/* ── Pages ── */}
       {page === "dashboard" && (
         <Dashboard
-          user={user} salaries={salaries} entretiens={entretiens}
+          user={user} salaries={salaries} entretiens={entretiens} sites={sites}
           setPage={navigate} setSelectedSalarie={setSel}
         />
       )}
