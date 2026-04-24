@@ -66,7 +66,7 @@ Deno.serve(async (req) => {
     // ── 3. Envoyer l'invitation avec la service_role key ─────────────────────
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SERVICE_ROLE_KEY")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,  // auto-injecté par Supabase
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 

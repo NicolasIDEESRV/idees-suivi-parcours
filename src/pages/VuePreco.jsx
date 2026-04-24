@@ -2,12 +2,14 @@ import { useState } from "react";
 import { daysUntil, dureeM, urgC, fmt } from "../lib/utils";
 
 export default function VuePreco({ user, salaries, sites, entretiens, setPage, setSelectedSalarie, onOpenSortie }) {
-  const [fs,  setFs]  = useState(user.site_id || "all");
-  const [fst, setFst] = useState("actifs");
+  const [fs,     setFs]     = useState(user.site_id || "all");
+  const [fst,    setFst]    = useState("actifs");
+  const [search, setSearch] = useState("");
 
   const list = salaries.filter(s =>
     (fs === "all" || s.site_id === fs) &&
-    (fst === "tous" || (fst === "actifs" && !s.dateSortie) || (fst === "sortis" && s.dateSortie))
+    (fst === "tous" || (fst === "actifs" && !s.dateSortie) || (fst === "sortis" && s.dateSortie)) &&
+    `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase())
   );
 
   const headers = ["NOM Prénom","Fin agrément","TS","PB","VH","CV","Langue","Entrée","Fin contrat","Mois","Sortie","Dyn.","Rappeler","Préco","Suivi social","Projet","Domaines","Action"];
@@ -16,7 +18,13 @@ export default function VuePreco({ user, salaries, sites, entretiens, setPage, s
     <div className="p-6">
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Vue PRECO</h1>
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap items-center">
+          <input
+            className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200 min-w-40"
+            placeholder="Rechercher un salarié…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
           {user.role === "admin" && (
             <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" value={fs} onChange={e => setFs(e.target.value)}>
               <option value="all">Tous les sites</option>
@@ -33,7 +41,7 @@ export default function VuePreco({ user, salaries, sites, entretiens, setPage, s
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-x-auto">
         <table className="text-xs min-w-full">
-          <thead className="bg-indigo-50 border-b border-indigo-100">
+          <thead className="bg-indigo-50 border-b border-indigo-100 sticky top-0 z-20">
             <tr>
               {headers.map((h, i) => (
                 <th key={h} className={`text-left px-3 py-2.5 font-semibold text-indigo-700 whitespace-nowrap ${

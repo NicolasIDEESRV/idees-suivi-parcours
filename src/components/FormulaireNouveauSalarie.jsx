@@ -65,11 +65,35 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
               <FSec>Publics prioritaires</FSec>
               <div className="col-span-2 grid grid-cols-2 gap-3">
                 <FCheck label="DELD"          checked={form.deld}         onChange={e => upd("deld",         e.target.checked)} />
-                <FCheck label="BRSA"          checked={form.brsa}         onChange={e => upd("brsa",         e.target.checked)} />
                 <FCheck label="TH / RQTH"     checked={form.th}           onChange={e => upd("th",           e.target.checked)} />
-                <FCheck label="ASS"           checked={form.ass}          onChange={e => upd("ass",          e.target.checked)} />
-                <FCheck label="Sans ressources" checked={form.sansRessources} onChange={e => upd("sansRessources", e.target.checked)} />
                 <FCheck label="Résident QPV"  checked={form.residentQPV}  onChange={e => upd("residentQPV",  e.target.checked)} />
+              </div>
+              {/* BRSA / ASS / Sans ressources — un seul choix possible */}
+              <div className="col-span-2">
+                <p className="text-xs font-medium text-gray-600 mb-2">Allocation / Ressources <span className="text-gray-400">(un seul choix)</span></p>
+                <div className="flex gap-3 flex-wrap">
+                  {[
+                    { key: "brsa",          label: "BRSA" },
+                    { key: "ass",           label: "ASS" },
+                    { key: "sansRessources",label: "Sans ressources" },
+                  ].map(({ key, label }) => (
+                    <button key={key} type="button"
+                      onClick={() => setForm(f => ({
+                        ...f,
+                        brsa:          key === "brsa"           ? !f.brsa          : false,
+                        ass:           key === "ass"            ? !f.ass           : false,
+                        sansRessources:key === "sansRessources" ? !f.sansRessources : false,
+                      }))}
+                      className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                        form[key]
+                          ? "bg-indigo-600 text-white border-indigo-600"
+                          : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
           )}

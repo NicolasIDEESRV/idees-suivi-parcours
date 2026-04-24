@@ -38,6 +38,8 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
   const [selected,   setSelected]   = useState(new Set());   // IDs sélectionnés
   const [confirmDel, setConfirmDel] = useState(false);
   const [deleting,   setDeleting]   = useState(false);
+  const [sortCol,    setSortCol]    = useState("nom");
+  const [sortDir,    setSortDir]    = useState(1); // 1 = asc, -1 = desc
 
   const isAdmin = user.role === "admin";
 
@@ -47,6 +49,19 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
     `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase()) &&
     (fs === "tous" || (fs === "actifs" && !s.dateSortie) || (fs === "sortis" && s.dateSortie))
   );
+
+  const sorted = [...list].sort((a, b) => {
+    let va = a[sortCol] ?? "";
+    let vb = b[sortCol] ?? "";
+    if (typeof va === "boolean") { va = va ? 1 : 0; vb = vb ? 1 : 0; }
+    return String(va).localeCompare(String(vb), "fr") * sortDir;
+  });
+
+  const toggleSort = (col) => {
+    if (sortCol === col) setSortDir(d => -d);
+    else { setSortCol(col); setSortDir(1); }
+  };
+  const sortIcon = (col) => sortCol === col ? (sortDir === 1 ? " ↑" : " ↓") : " ↕";
 
   // ── Sélection ───────────────────────────────────────────────────────────────
   const allSelected  = list.length > 0 && list.every(s => selected.has(s.id));
@@ -152,13 +167,27 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
                   />
                 </th>
               )}
-              {["Salarié","Âge","Entrée","Durée","Fin contrat","Prescripteur","Statut",""].map(h => (
-                <th key={h} className="text-left p-3 text-xs font-semibold text-gray-400 uppercase">{h}</th>
+              {[
+                { label: "Salarié",      col: "nom" },
+                { label: "Âge",          col: "dateNaissance" },
+                { label: "Entrée",       col: "dateEntree" },
+                { label: "Durée",        col: null },
+                { label: "Fin contrat",  col: "dateFinContrat" },
+                { label: "Prescripteur", col: "prescripteur" },
+                { label: "Statut",       col: "dateSortie" },
+                { label: "",             col: null },
+              ].map(({ label, col }) => (
+                <th key={label}
+                  onClick={() => col && toggleSort(col)}
+                  className={`text-left p-3 text-xs font-semibold uppercase select-none ${col ? "text-gray-500 cursor-pointer hover:text-indigo-600" : "text-gray-400"}`}
+                >
+                  {label}{col ? sortIcon(col) : ""}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {list.map(s => {
+            {sorted.map(s => {
               const d   = daysUntil(s.dateFinContrat);
               const sel = selected.has(s.id);
               return (
