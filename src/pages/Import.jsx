@@ -26,15 +26,19 @@ const SKIP_COLS = new Set([
 const UUID_RE  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE_RE  = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_COLS = new Set(["site_id","cip_id","assigned_to"]);
-const DATE_COLS = new Set(["date_naissance","date_entree","date_sortie","date_fin_contrat","date_fin_agrement","date_premier_inscription","css_jusqu_au","rappel_jusqu_au","date_bilan","date_first_emploi"]);
+// Liste EXHAUSTIVE des colonnes DATE de la table salaries (schema.sql)
+const DATE_COLS = new Set([
+  "date_naissance","date_entree","date_sortie","date_fin_contrat","date_fin_agrement",
+  "titre_sejour",          // date d'expiration du titre de séjour
+  "date_premier_inscription","css_jusqu_au","rappel_jusqu_au","date_bilan","date_first_emploi",
+]);
 
-// Détecte dynamiquement toute colonne dont le nom suggère une date
+// Détecte dynamiquement toute autre colonne dont le nom suggère une date
 const isDateCol = (key) =>
   DATE_COLS.has(key) ||
   key.startsWith("date_") ||
   key.endsWith("_date") ||
-  key.includes("_jusqu_") ||
-  key.includes("_au") && key.startsWith("css") ||
+  key.includes("_jusqu_au") ||
   key.includes("rappel");
 
 // Valeurs acceptées par chaque enum Supabase
@@ -79,37 +83,34 @@ const normalizeEnum = (col, v) => {
   return set.has(s) ? s : null;
 };
 
+// Convertit un numéro de série Excel en "YYYY-MM-DD" (méthode manuelle, sans XLSX.SSF)
+const excelSerialToISO = (n) => {
+  if (!n || n <= 0) return null;
+  // L'époque Excel = 30 déc 1899 (tient compte du bug leap-year 1900 d'Excel)
+  const ms = Math.round((n - 25569) * 86400 * 1000);
+  const d = new Date(ms);
+  if (isNaN(d.getTime())) return null;
+  const y = d.getUTCFullYear();
+  if (y < 1900 || y > 2200) return null;
+  return `${y}-${String(d.getUTCMonth()+1).padStart(2,"0")}-${String(d.getUTCDate()).padStart(2,"0")}`;
+};
+
 const normalizeDate = (v) => {
   if (v === null || v === undefined || v === "") return null;
-  // Nombre de série Excel (numérique)
-  if (typeof v === "number") {
-    if (v <= 0) return null;
-    try {
-      const d = XLSX.SSF.parse_date_code(v);
-      if (d && d.y > 1900) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
-    } catch { /* */ }
-    return null;
-  }
+  // Numéro de série Excel (nombre)
+  if (typeof v === "number") return excelSerialToISO(v);
   // Objet Date (cellDates:true)
   if (v instanceof Date) {
     if (isNaN(v)) return null;
-    const iso = v.toISOString().slice(0,10);
-    return DATE_RE.test(iso) ? iso : null;
+    const y = v.getUTCFullYear(), m = v.getUTCMonth()+1, d = v.getUTCDate();
+    if (y < 1900 || y > 2200) return null;
+    return `${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
   }
   const s = String(v).trim();
   if (!s || s === "0") return null;
-  // Nombre de série sous forme de chaîne (ex: "46880" — cellule Excel formatée Texte)
-  if (/^\d{4,6}$/.test(s)) {
-    const n = Number(s);
-    if (n > 0) {
-      try {
-        const d = XLSX.SSF.parse_date_code(n);
-        if (d && d.y > 1900) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
-      } catch { /* */ }
-    }
-    return null;
-  }
-  // Format ISO attendu : "YYYY-MM-DD"
+  // Numéro de série sous forme de chaîne (cellule Excel formatée Texte, ex: "46880")
+  if (/^\d{4,6}$/.test(s)) return excelSerialToISO(Number(s));
+  // Format ISO attendu "YYYY-MM-DD"
   return DATE_RE.test(s) ? s : null; // "CI", "CNI", "indéterminé"… → null
 };
 
