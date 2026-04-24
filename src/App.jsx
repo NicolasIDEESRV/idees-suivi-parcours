@@ -14,6 +14,7 @@ import FicheSalarie from "./pages/FicheSalarie";
 import VuePreco     from "./pages/VuePreco";
 import ListeSalaries from "./pages/ListeSalaries";
 import Stats        from "./pages/Stats";
+import Import       from "./pages/Import";
 import Export       from "./pages/Export";
 import Admin        from "./pages/Admin";
 
@@ -187,6 +188,9 @@ function AppInner({ user, onLogout }) {
       )}
       {page === "stats" && (
         <Stats user={user} salaries={salaries} sites={sites} />
+      )}
+      {page === "import" && (
+        <Import user={user} sites={sites} profiles={profiles} />
       )}
       {page === "export" && (
         <Export
