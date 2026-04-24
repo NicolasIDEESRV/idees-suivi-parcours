@@ -5,6 +5,105 @@ import { fC } from "../lib/theme";
 import { Card, Row } from "../components/ui";
 import EntretienForm from "../components/EntretienForm";
 
+// ─── Définition des champs suivis pour la complétude ─────────────────────────
+const CHAMPS = [
+  { key: "dateNaissance",         label: "Date de naissance",      cat: "État civil"  },
+  { key: "sexe",                  label: "Sexe",                    cat: "État civil"  },
+  { key: "telephone",             label: "Téléphone",               cat: "État civil"  },
+  { key: "mail",                  label: "Email",                   cat: "État civil"  },
+  { key: "dateFinContrat",        label: "Fin de contrat",          cat: "Parcours"    },
+  { key: "nomPrenomPrescripteur", label: "Référent prescripteur",   cat: "Parcours"    },
+  { key: "situationMaritale",     label: "Situation maritale",      cat: "Situation"   },
+  { key: "hebergement",           label: "Hébergement",             cat: "Situation"   },
+  { key: "niveauFormation",       label: "Niveau de formation",     cat: "Formation"   },
+  { key: "niveauLangue",          label: "Niveau de langue",        cat: "Formation"   },
+  { key: "moyenTransport",        label: "Moyen de transport",      cat: "Mobilité"    },
+  { key: "projetPro",             label: "Projet professionnel",    cat: "Projet pro"  },
+  { key: "preconisation",         label: "Préconisation",           cat: "Projet pro"  },
+  { key: "_freins",               label: "Freins à l'entrée",       cat: "Freins",
+    check: s => Object.values(s.freinsEntree || {}).some(v => v) },
+  { key: "synthBesoinsEntree",    label: "Synthèse des besoins",    cat: "Synthèse"    },
+];
+
+function useCompletion(salarie) {
+  const manquants = CHAMPS.filter(c => {
+    if (c.check) return !c.check(salarie);
+    const v = salarie[c.key];
+    return !v || v === "";
+  });
+  const score = Math.round((CHAMPS.length - manquants.length) / CHAMPS.length * 100);
+  return { score, manquants };
+}
+
+// ─── Composant indicateur de complétude ───────────────────────────────────────
+function CompletionBar({ salarie, onEdit }) {
+  const [open, setOpen] = useState(false);
+  const { score, manquants } = useCompletion(salarie);
+
+  const color = score >= 80 ? "bg-green-500" : score >= 50 ? "bg-orange-400" : "bg-red-400";
+  const textColor = score >= 80 ? "text-green-700" : score >= 50 ? "text-orange-700" : "text-red-600";
+  const bgLight   = score >= 80 ? "bg-green-50 border-green-200" : score >= 50 ? "bg-orange-50 border-orange-200" : "bg-red-50 border-red-200";
+
+  // Regrouper les manquants par catégorie
+  const parCat = manquants.reduce((acc, c) => {
+    acc[c.cat] = acc[c.cat] ? [...acc[c.cat], c.label] : [c.label];
+    return acc;
+  }, {});
+
+  return (
+    <div className="mt-3">
+      {/* Barre + score cliquable */}
+      <button onClick={() => setOpen(o => !o)}
+        className="w-full text-left group"
+        title={manquants.length ? "Voir les champs manquants" : "Fiche complète"}>
+        <div className="flex items-center justify-between mb-1">
+          <span className="text-xs text-gray-400 font-medium">
+            Complétude de la fiche
+          </span>
+          <span className={`text-xs font-bold ${textColor}`}>
+            {score}% — {manquants.length === 0 ? "✓ complet" : `${manquants.length} champ${manquants.length > 1 ? "s" : ""} manquant${manquants.length > 1 ? "s" : ""}`}
+            <span className="ml-1 text-gray-300 group-hover:text-gray-500">{open ? "▲" : "▼"}</span>
+          </span>
+        </div>
+        <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${score}%` }} />
+        </div>
+      </button>
+
+      {/* Détail des manquants */}
+      {open && manquants.length > 0 && (
+        <div className={`mt-2 rounded-xl border p-3 ${bgLight}`}>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-semibold text-gray-600">Champs à compléter</p>
+            <button onClick={onEdit}
+              className="text-xs text-indigo-600 hover:text-indigo-800 font-medium underline">
+              ✏ Ouvrir le formulaire
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            {Object.entries(parCat).map(([cat, labels]) => (
+              <div key={cat}>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">{cat}</p>
+                {labels.map(l => (
+                  <p key={l} className="text-xs text-gray-600 flex items-center gap-1">
+                    <span className="text-orange-400">·</span> {l}
+                  </p>
+                ))}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {open && manquants.length === 0 && (
+        <p className="mt-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-xl px-3 py-2">
+          ✓ Tous les champs sont renseignés — fiche complète.
+        </p>
+      )}
+    </div>
+  );
+}
+
 export default function FicheSalarie({ salarie, entretiens, user, users, setPage, onEdit, onAddEntretien, onOpenSortie, onDelete }) {
   const [tab,   setTab]   = useState("apercu");
   const [showE, setShowE] = useState(false);
@@ -105,6 +204,9 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
             })}
           </div>
         )}
+
+        {/* Complétude de la fiche */}
+        <CompletionBar salarie={salarie} onEdit={() => onEdit(salarie)} />
 
         {/* Alertes échéances */}
         <div className="flex gap-2 mt-2 flex-wrap">
