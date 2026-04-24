@@ -190,7 +190,7 @@ function AppInner({ user, onLogout }) {
         <Stats user={user} salaries={salaries} sites={sites} />
       )}
       {page === "import" && (
-        <Import user={user} sites={sites} profiles={profiles} />
+        <Import user={user} sites={sites} />
       )}
       {page === "export" && (
         <Export

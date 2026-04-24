@@ -87,7 +87,7 @@ function rowToPayload(row, siteIdOverride, cipIdOverride) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Import({ user, sites, profiles }) {
+export default function Import({ user, sites }) {
   const fileRef  = useRef(null);
   const [file,      setFile]      = useState(null);
   const [rows,      setRows]      = useState([]);   // données parsées
@@ -95,7 +95,6 @@ export default function Import({ user, sites, profiles }) {
   const [labelRow,  setLabelRow]  = useState([]);   // noms FR (ligne 2)
   const [parseErr,  setParseErr]  = useState("");
   const [siteOver,  setSiteOver]  = useState("");   // override site_id
-  const [cipOver,   setCipOver]   = useState("");   // override cip_id
   const [importing, setImporting] = useState(false);
   const [progress,  setProgress]  = useState(null); // { done, total, errors[] }
   const [done,      setDone]      = useState(false);
@@ -174,7 +173,7 @@ export default function Import({ user, sites, profiles }) {
 
     for (const row of rows) {
       try {
-        const payload = rowToPayload(row, siteOver || null, cipOver || null);
+        const payload = rowToPayload(row, siteOver || null, null);
 
         // Valider champs obligatoires
         if (!payload.nom || !payload.prenom) {
@@ -185,10 +184,7 @@ export default function Import({ user, sites, profiles }) {
           errors.push({ nom: `${payload.nom} ${payload.prenom}`, err: "site_id manquant — sélectionnez un site ci-dessus" });
           continue;
         }
-        if (!payload.cip_id) {
-          errors.push({ nom: `${payload.nom} ${payload.prenom}`, err: "cip_id manquant — sélectionnez un CIP ci-dessus" });
-          continue;
-        }
+
 
         const { error } = await supabase.from("salaries").insert(payload);
         if (error) throw new Error(error.message);
@@ -205,8 +201,7 @@ export default function Import({ user, sites, profiles }) {
   };
 
   // ── UI ────────────────────────────────────────────────────────────────────
-  const siteOptions = sites.filter(s => !siteOver || true);
-  const cipOptions  = profiles.filter(p => p.role === "cip" || p.role === "direction");
+  const siteOptions = sites;
 
   const PREVIEW_COLS = ["nom", "prenom", "date_entree", "prescripteur", "site_id"];
   const previewHeaders = headers.filter(h => PREVIEW_COLS.includes(h));
@@ -257,34 +252,22 @@ export default function Import({ user, sites, profiles }) {
           {/* ── Overrides site / CIP ──────────────────────────────────────── */}
           <div className="bg-white rounded-2xl border border-gray-200 p-5 space-y-4">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-              Affecter un site et un CIP à tous les salariés importés
+              Affecter un site à tous les salariés importés
             </p>
             <p className="text-xs text-gray-400">
-              Si votre fichier contient déjà les IDs Supabase, laissez vide. Sinon, sélectionnez ici.
+              Si votre fichier contient déjà le site_id Supabase, laissez vide. Sinon, sélectionnez ici.
             </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">Site <span className="text-red-500">*</span></label>
-                <select value={siteOver} onChange={e => setSiteOver(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
-                  <option value="">— Utiliser les IDs du fichier —</option>
-                  {siteOptions.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs font-medium text-gray-600 block mb-1">CIP référent <span className="text-red-500">*</span></label>
-                <select value={cipOver} onChange={e => setCipOver(e.target.value)}
-                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
-                  <option value="">— Utiliser les IDs du fichier —</option>
-                  {cipOptions.map(p => (
-                    <option key={p.id} value={p.id}>{p.prenom} {p.nom}</option>
-                  ))}
-                </select>
-              </div>
+            <div className="max-w-sm">
+              <label className="text-xs font-medium text-gray-600 block mb-1">Site <span className="text-red-500">*</span></label>
+              <select value={siteOver} onChange={e => setSiteOver(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
+                <option value="">— Utiliser les IDs du fichier —</option>
+                {siteOptions.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
 
