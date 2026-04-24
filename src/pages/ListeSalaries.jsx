@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { getAge, dureeM, daysUntil, urgC, fmt } from "../lib/utils";
+import { getAge, dureeM, daysUntil, urgC, fmt, getScopeIds } from "../lib/utils";
 
-export default function ListeSalaries({ user, salaries, sites, setPage, setSelectedSalarie, onNew, onOpenSortie }) {
+export default function ListeSalaries({ user, salaries, sites = [], setPage, setSelectedSalarie, onNew, onOpenSortie }) {
   const [search, setSearch] = useState("");
   const [fs,     setFs]     = useState("actifs");
 
-  const mine = user.role === "admin" ? salaries : salaries.filter(s => s.site_id === user.site_id);
+  const scopeIds = getScopeIds(user, sites);
+  const mine = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
   const list = mine.filter(s =>
     `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase()) &&
     (fs === "tous" || (fs === "actifs" && !s.dateSortie) || (fs === "sortis" && s.dateSortie))

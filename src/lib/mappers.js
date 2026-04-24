@@ -14,7 +14,11 @@ export const mapProfileFromDB = (row) => ({
   prenom:    row.prenom,
   email:     row.email,
   role:      row.role,        // 'admin' | 'direction' | 'cip'
-  site_id:   row.site_id,    // null pour admin/direction
+  site_id:   row.site_id,    // premier site (rétrocompatibilité)
+  // Tableau de tous les site_id accessibles (prioritaire sur site_id)
+  site_ids:  Array.isArray(row.site_ids) && row.site_ids.length > 0
+               ? row.site_ids
+               : (row.site_id ? [row.site_id] : []),
   actif:     row.actif,
 });
 

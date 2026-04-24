@@ -32,7 +32,11 @@ function RoleBadge({ role }) {
 // ─── Carte utilisateur (avec édition inline) ──────────────────────────────────
 function UserCard({ profile, sites, onSaved }) {
   const [editing, setEditing] = useState(false);
-  const [form,    setForm]    = useState({ role: profile.role, site_id: profile.site_id ?? "", actif: profile.actif });
+  const [form,    setForm]    = useState({
+    role:     profile.role,
+    site_ids: profile.site_ids ?? (profile.site_id ? [profile.site_id] : []),
+    actif:    profile.actif,
+  });
   const [saving,  setSaving]  = useState(false);
   const [err,     setErr]     = useState("");
 
@@ -40,15 +44,16 @@ function UserCard({ profile, sites, onSaved }) {
 
   const save = async () => {
     setErr("");
-    if (form.role === "cip" && !form.site_id) {
-      return setErr("Un CIP doit avoir un site.");
+    if (form.role !== "admin" && form.site_ids.length === 0) {
+      return setErr("Sélectionnez au moins un site.");
     }
     setSaving(true);
     try {
       await updateProfile(profile.id, {
-        role:    form.role,
-        site_id: form.role === "cip" ? form.site_id : null,
-        actif:   form.actif,
+        role:     form.role,
+        site_id:  form.role === "admin" ? null : (form.site_ids[0] ?? null),
+        site_ids: form.role === "admin" ? [] : form.site_ids,
+        actif:    form.actif,
       });
       setEditing(false);
       onSaved();
@@ -59,7 +64,8 @@ function UserCard({ profile, sites, onSaved }) {
     }
   };
 
-  const site = sites.find(s => s.id === profile.site_id);
+  // Sites affichés dans la carte (hors édition)
+  const assignedSites = (profile.site_ids ?? []).map(id => sites.find(s => s.id === id)).filter(Boolean);
 
   return (
     <div className={`bg-white rounded-xl border p-4 transition-all ${!profile.actif ? "opacity-50" : ""}`}>
@@ -84,11 +90,18 @@ function UserCard({ profile, sites, onSaved }) {
             )}
           </div>
           <p className="text-xs text-gray-400 truncate">{profile.email}</p>
-          {site && (
-            <p className="text-xs text-gray-500 mt-0.5">
-              {site.filiale && <span className="mr-1">{site.filiale} —</span>}
-              {site.nom}
-            </p>
+          {/* Sites assignés */}
+          {assignedSites.length > 0 && (
+            <div className="mt-0.5 space-y-0.5">
+              {assignedSites.slice(0, 3).map(s => (
+                <p key={s.id} className="text-xs text-gray-500">
+                  {[s.filiale, s.nom].filter(Boolean).join(" › ")}
+                </p>
+              ))}
+              {assignedSites.length > 3 && (
+                <p className="text-xs text-gray-400 italic">+{assignedSites.length - 3} autre{assignedSites.length - 3 > 1 ? "s" : ""}</p>
+              )}
+            </div>
           )}
         </div>
 
@@ -107,24 +120,24 @@ function UserCard({ profile, sites, onSaved }) {
           <FSelect
             label="Rôle"
             value={form.role}
-            onChange={e => setForm(f => ({ ...f, role: e.target.value }))}
+            onChange={e => setForm(f => ({ ...f, role: e.target.value, site_ids: e.target.value === "admin" ? [] : f.site_ids }))}
           >
             {ROLES.map(r => (
               <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>
             ))}
           </FSelect>
 
-          {form.role === "cip" && (
-            <FSelect
-              label="Site"
-              value={form.site_id}
-              onChange={e => setForm(f => ({ ...f, site_id: e.target.value }))}
-            >
-              <option value="">— Sélectionner un site —</option>
-              {sites.map(s => (
-                <option key={s.id} value={s.id}>{s.nom}</option>
-              ))}
-            </FSelect>
+          {form.role !== "admin" && (
+            <div className="bg-gray-50 rounded-xl p-4 space-y-4">
+              <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                Sites accessibles ({form.site_ids.length} sélectionné{form.site_ids.length > 1 ? "s" : ""})
+              </p>
+              <SiteMultiPicker
+                sites={sites}
+                value={form.site_ids}
+                onChange={ids => setForm(f => ({ ...f, site_ids: ids }))}
+              />
+            </div>
           )}
 
           <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -194,19 +207,20 @@ function ByFiliale({ profiles, sites, onRefresh }) {
     filialeMap[fil][sec][act].push(s);
   });
 
-  const crossSite = profiles.filter(p => p.role !== "cip");
+  // Admin = accès global, Direction/CIP multi-sites = apparaissent dans chaque filiale concernée
+  const adminProfiles = profiles.filter(p => p.role === "admin");
 
   return (
     <div className="space-y-10">
-      {/* Admin / Direction */}
-      {crossSite.length > 0 && (
+      {/* Admins (accès global) */}
+      {adminProfiles.length > 0 && (
         <section>
           <div className="flex items-center gap-2 mb-3">
-            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Accès multi-sites</h3>
-            <span className="text-xs text-gray-400">(Admin + Direction)</span>
+            <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Administrateurs</h3>
+            <span className="text-xs text-gray-400">(accès global)</span>
           </div>
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {crossSite.map(p => <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />)}
+            {adminProfiles.map(p => <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />)}
           </div>
         </section>
       )}
@@ -232,17 +246,20 @@ function ByFiliale({ profiles, sites, onRefresh }) {
                   </p>
 
                   {sitesList.map(site => {
-                    const cips = profiles.filter(p => p.role === "cip" && p.site_id === site.id);
+                    // Utilisateurs ayant ce site dans leur site_ids (Direction + CIP)
+                    const assigned = profiles.filter(p =>
+                      p.role !== "admin" && (p.site_ids ?? []).includes(site.id)
+                    );
                     return (
                       <div key={site.id} className="ml-4 mb-3">
                         <p className="text-xs text-gray-500 font-medium mb-2">
                           Site — {site.nom}{site.ville ? ` (${site.ville})` : ""}
                         </p>
-                        {cips.length === 0 ? (
-                          <p className="text-xs text-gray-300 italic pl-1">Aucun CIP</p>
+                        {assigned.length === 0 ? (
+                          <p className="text-xs text-gray-300 italic pl-1">Aucun utilisateur affecté</p>
                         ) : (
                           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                            {cips.map(p => <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />)}
+                            {assigned.map(p => <UserCard key={p.id} profile={p} sites={sites} onSaved={onRefresh} />)}
                           </div>
                         )}
                       </div>
@@ -325,17 +342,14 @@ function UserManagement({ sites }) {
   );
 }
 
-// ─── Sélecteur hiérarchique filiale → secteur → activité → site ──────────────
-function SiteHierarchyPicker({ sites, value, onChange }) {
-  // Construire la hiérarchie unique depuis les sites disponibles
-  const filialesList = [...new Set(sites.map(s => s.filiale).filter(Boolean))];
+// ─── Sélecteur hiérarchique multi-sites (filiale → secteur → activité → ✓ sites)
+function SiteMultiPicker({ sites, value = [], onChange }) {
+  const [filiale,  setFiliale]  = useState("");
+  const [secteur,  setSecteur]  = useState("");
+  const [activite, setActivite] = useState("");
 
-  const [filiale,  setFiliale]  = useState(() => sites.find(s => s.id === value)?.filiale ?? "");
-  const [secteur,  setSecteur]  = useState(() => sites.find(s => s.id === value)?.secteur ?? "");
-  const [activite, setActivite] = useState(() => sites.find(s => s.id === value)?.activite ?? "");
-
-  // Listes filtrées selon la sélection en cours
-  const secteursList = [...new Set(
+  const filialesList  = [...new Set(sites.map(s => s.filiale).filter(Boolean))];
+  const secteursList  = [...new Set(
     sites.filter(s => !filiale || s.filiale === filiale).map(s => s.secteur).filter(Boolean)
   )];
   const activitesList = [...new Set(
@@ -348,14 +362,19 @@ function SiteHierarchyPicker({ sites, value, onChange }) {
     (!activite || s.activite === activite)
   );
 
-  const pick = (field, val) => {
-    if (field === "filiale")  { setFiliale(val); setSecteur(""); setActivite(""); onChange(""); }
-    if (field === "secteur")  { setSecteur(val); setActivite(""); onChange(""); }
-    if (field === "activite") { setActivite(val); onChange(""); }
-    if (field === "site")     { onChange(val); }
+  const toggle = siteId => onChange(
+    value.includes(siteId) ? value.filter(id => id !== siteId) : [...value, siteId]
+  );
+
+  // Cocher/décocher tous les sites filtrés d'un coup
+  const toggleAll = () => {
+    const ids = sitesFiltres.map(s => s.id);
+    const allChecked = ids.every(id => value.includes(id));
+    if (allChecked) onChange(value.filter(id => !ids.includes(id)));
+    else onChange([...new Set([...value, ...ids])]);
   };
 
-  const Chip = ({ label, active, onClick }) => (
+  const NavChip = ({ label, active, onClick }) => (
     <button type="button" onClick={onClick}
       className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
         active ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
@@ -363,50 +382,98 @@ function SiteHierarchyPicker({ sites, value, onChange }) {
     >{label}</button>
   );
 
+  const selectedSites = sites.filter(s => value.includes(s.id));
+
   return (
     <div className="space-y-3">
-      {/* Filiale */}
+
+      {/* ── Tags sites sélectionnés ── */}
+      {selectedSites.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
+            Sélectionnés ({selectedSites.length})
+          </p>
+          <div className="flex flex-wrap gap-1.5">
+            {selectedSites.map(s => (
+              <span key={s.id}
+                className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-0.5 rounded-full border border-indigo-200">
+                {[s.filiale, s.nom].filter(Boolean).join(" › ")}
+                <button type="button" onClick={() => toggle(s.id)}
+                  className="ml-0.5 text-indigo-400 hover:text-red-500 leading-none">×</button>
+              </span>
+            ))}
+            <button type="button" onClick={() => onChange([])}
+              className="text-xs text-red-400 hover:text-red-600 px-1">
+              Tout effacer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Navigation : Filiale ── */}
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Filiale</p>
         <div className="flex flex-wrap gap-2">
-          <Chip label="Toutes" active={!filiale} onClick={() => pick("filiale", "")} />
-          {filialesList.map(f => <Chip key={f} label={f} active={filiale === f} onClick={() => pick("filiale", f)} />)}
+          <NavChip label="Toutes" active={!filiale} onClick={() => { setFiliale(""); setSecteur(""); setActivite(""); }} />
+          {filialesList.map(f => <NavChip key={f} label={f} active={filiale === f} onClick={() => { setFiliale(f); setSecteur(""); setActivite(""); }} />)}
         </div>
       </div>
 
-      {/* Secteur */}
+      {/* ── Navigation : Secteur ── */}
       {secteursList.length > 0 && (
         <div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Secteur</p>
           <div className="flex flex-wrap gap-2">
-            <Chip label="Tous" active={!secteur} onClick={() => pick("secteur", "")} />
-            {secteursList.map(s => <Chip key={s} label={s} active={secteur === s} onClick={() => pick("secteur", s)} />)}
+            <NavChip label="Tous" active={!secteur} onClick={() => { setSecteur(""); setActivite(""); }} />
+            {secteursList.map(s => <NavChip key={s} label={s} active={secteur === s} onClick={() => { setSecteur(s); setActivite(""); }} />)}
           </div>
         </div>
       )}
 
-      {/* Activité */}
+      {/* ── Navigation : Activité ── */}
       {activitesList.length > 0 && (
         <div>
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">Activité</p>
           <div className="flex flex-wrap gap-2">
-            <Chip label="Toutes" active={!activite} onClick={() => pick("activite", "")} />
-            {activitesList.map(a => <Chip key={a} label={a} active={activite === a} onClick={() => pick("activite", a)} />)}
+            <NavChip label="Toutes" active={!activite} onClick={() => setActivite("")} />
+            {activitesList.map(a => <NavChip key={a} label={a} active={activite === a} onClick={() => setActivite(a)} />)}
           </div>
         </div>
       )}
 
-      {/* Site final */}
+      {/* ── Checkboxes sites ── */}
       <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1.5">
-          Site {sitesFiltres.length > 1 ? `(${sitesFiltres.length} disponibles)` : ""}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {sitesFiltres.map(s => (
-            <Chip key={s.id} label={`${s.nom} — ${s.ville}`} active={value === s.id} onClick={() => pick("site", s.id)} />
-          ))}
-          {sitesFiltres.length === 0 && <p className="text-xs text-gray-400 italic">Aucun site correspondant</p>}
+        <div className="flex items-center justify-between mb-1.5">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+            Sites ({sitesFiltres.length})
+          </p>
+          {sitesFiltres.length > 1 && (
+            <button type="button" onClick={toggleAll}
+              className="text-xs text-indigo-500 hover:text-indigo-700">
+              {sitesFiltres.every(s => value.includes(s.id)) ? "Tout décocher" : "Tout cocher"}
+            </button>
+          )}
         </div>
+        {sitesFiltres.length === 0
+          ? <p className="text-xs text-gray-400 italic">Aucun site correspondant</p>
+          : (
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+              {sitesFiltres.map(s => (
+                <label key={s.id} className="flex items-center gap-2 cursor-pointer group">
+                  <input
+                    type="checkbox"
+                    checked={value.includes(s.id)}
+                    onChange={() => toggle(s.id)}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-xs text-gray-700 group-hover:text-indigo-700">
+                    {s.nom}{s.ville ? ` — ${s.ville}` : ""}
+                  </span>
+                </label>
+              ))}
+            </div>
+          )
+        }
       </div>
     </div>
   );
@@ -414,16 +481,18 @@ function SiteHierarchyPicker({ sites, value, onChange }) {
 
 // ─── Onglet Invitations ───────────────────────────────────────────────────────
 function InviteForm({ sites }) {
-  const [email,   setEmail]   = useState("");
-  const [role,    setRole]    = useState("cip");
-  const [siteId,  setSiteId]  = useState("");
-  const [loading, setLoading] = useState(false);
-  const [msg,     setMsg]     = useState(null);
+  const [email,    setEmail]    = useState("");
+  const [role,     setRole]     = useState("cip");
+  const [siteIds,  setSiteIds]  = useState([]);
+  const [loading,  setLoading]  = useState(false);
+  const [msg,      setMsg]      = useState(null);
+
+  const needsSites = role === "cip" || role === "direction";
 
   const send = async () => {
     setMsg(null);
     if (!email.trim()) return setMsg({ type: "error", text: "L'email est obligatoire." });
-    if (role === "cip" && !siteId) return setMsg({ type: "error", text: "Sélectionnez un site pour un CIP." });
+    if (needsSites && siteIds.length === 0) return setMsg({ type: "error", text: "Sélectionnez au moins un site." });
 
     setLoading(true);
     try {
@@ -437,14 +506,19 @@ function InviteForm({ sites }) {
             "Authorization": `Bearer ${session.access_token}`,
             "apikey":        import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
-          body: JSON.stringify({ email: email.trim(), role, site_id: role === "cip" ? siteId : null }),
+          body: JSON.stringify({
+            email:    email.trim(),
+            role,
+            site_id:  needsSites ? (siteIds[0] ?? null) : null,
+            site_ids: needsSites ? siteIds : [],
+          }),
         }
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Erreur serveur");
       setMsg({ type: "success", text: `Invitation envoyée à ${email.trim()}.` });
       setEmail("");
-      setSiteId("");
+      setSiteIds([]);
     } catch (e) {
       setMsg({ type: "error", text: e.message });
     } finally {
@@ -452,10 +526,10 @@ function InviteForm({ sites }) {
     }
   };
 
-  const selectedSite = sites.find(s => s.id === siteId);
+  const selectedSites = sites.filter(s => siteIds.includes(s.id));
 
   return (
-    <div className="max-w-xl space-y-6">
+    <div className="max-w-2xl space-y-6">
       <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-5">
         <h2 className="text-sm font-semibold text-gray-700">Envoyer une invitation</h2>
 
@@ -465,33 +539,35 @@ function InviteForm({ sites }) {
           placeholder="prenom.nom@idees.fr"
         />
 
-        <FSelect label="Rôle" required value={role} onChange={e => { setRole(e.target.value); setSiteId(""); }}>
+        <FSelect label="Rôle" required value={role} onChange={e => { setRole(e.target.value); setSiteIds([]); }}>
           {ROLES.map(r => <option key={r.value} value={r.value}>{r.label} — {r.desc}</option>)}
         </FSelect>
 
-        {/* Sélection hiérarchique pour CIP */}
-        {role === "cip" && (
+        {/* Sélection multi-sites pour CIP et Direction */}
+        {needsSites && (
           <div className="bg-gray-50 rounded-xl p-4 space-y-4">
             <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              Sélection du site d'affectation
+              Sites accessibles — {role === "cip" ? "CIP" : "Direction"} ({siteIds.length} sélectionné{siteIds.length > 1 ? "s" : ""})
             </p>
-            <SiteHierarchyPicker sites={sites} value={siteId} onChange={setSiteId} />
+            <SiteMultiPicker sites={sites} value={siteIds} onChange={setSiteIds} />
           </div>
         )}
 
         {/* Récapitulatif */}
-        {email && (role !== "cip" || siteId) && (
+        {email && (!needsSites || siteIds.length > 0) && (
           <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-800 space-y-1 border border-indigo-100">
             <p className="font-semibold mb-1">Récapitulatif de l'invitation</p>
             <p><span className="font-medium">Email :</span> {email}</p>
             <p><span className="font-medium">Rôle :</span> <RoleBadge role={role} /></p>
-            {selectedSite && (
-              <>
-                {selectedSite.filiale  && <p><span className="font-medium">Filiale :</span> {selectedSite.filiale}</p>}
-                {selectedSite.secteur  && <p><span className="font-medium">Secteur :</span> {selectedSite.secteur}</p>}
-                {selectedSite.activite && <p><span className="font-medium">Activité :</span> {selectedSite.activite}</p>}
-                <p><span className="font-medium">Site :</span> {selectedSite.nom} ({selectedSite.ville})</p>
-              </>
+            {selectedSites.length > 0 && (
+              <div className="mt-1">
+                <span className="font-medium">Sites ({selectedSites.length}) :</span>
+                <ul className="mt-0.5 space-y-0.5 pl-2">
+                  {selectedSites.map(s => (
+                    <li key={s.id}>{[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}</li>
+                  ))}
+                </ul>
+              </div>
             )}
           </div>
         )}

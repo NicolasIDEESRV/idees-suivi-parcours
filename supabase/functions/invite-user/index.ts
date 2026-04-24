@@ -49,13 +49,18 @@ Deno.serve(async (req) => {
     }
 
     // ── 2. Lire le corps de la requête ───────────────────────────────────────
-    const { email, role, site_id } = await req.json();
+    const { email, role, site_id, site_ids } = await req.json();
 
     if (!email || !role) {
       return Response.json({ error: "email et role sont obligatoires." }, { status: 400, headers: corsHeaders });
     }
-    if (role === "cip" && !site_id) {
-      return Response.json({ error: "site_id obligatoire pour le rôle CIP." }, { status: 400, headers: corsHeaders });
+    const needsSites = role === "cip" || role === "direction";
+    const resolvedSiteIds: string[] = Array.isArray(site_ids) && site_ids.length > 0
+      ? site_ids
+      : (site_id ? [site_id] : []);
+
+    if (needsSites && resolvedSiteIds.length === 0) {
+      return Response.json({ error: "Au moins un site est obligatoire pour ce rôle." }, { status: 400, headers: corsHeaders });
     }
 
     // ── 3. Envoyer l'invitation avec la service_role key ─────────────────────
@@ -69,7 +74,8 @@ Deno.serve(async (req) => {
       redirectTo: `${Deno.env.get("APP_URL") ?? "https://idees-suivi-parcours-oa5e.vercel.app"}`,
       data: {
         role,
-        site_id: site_id ?? null,
+        site_id:  resolvedSiteIds[0] ?? null,
+        site_ids: resolvedSiteIds,
       },
     });
 

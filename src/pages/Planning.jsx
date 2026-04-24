@@ -1,14 +1,15 @@
 import { useState } from "react";
-import { daysUntil, urgC, fmt } from "../lib/utils";
+import { daysUntil, urgC, fmt, getScopeIds } from "../lib/utils";
 
-export default function Planning({ user, salaries, entretiens, users, setPage, setSelectedSalarie }) {
+export default function Planning({ user, salaries, sites = [], entretiens, users, setPage, setSelectedSalarie }) {
   const [filterSal,    setFilterSal]    = useState("all");
   const [filterResp,   setFilterResp]   = useState("all");
   const [filterType,   setFilterType]   = useState("all");
   const [filterPeriod, setFilterPeriod] = useState("future");
   const [search,       setSearch]       = useState("");
 
-  const mineSal = user.role === "admin" ? salaries : salaries.filter(s => s.site_id === user.site_id);
+  const scopeIds = getScopeIds(user, sites);
+  const mineSal = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
 
   const items = [];
 

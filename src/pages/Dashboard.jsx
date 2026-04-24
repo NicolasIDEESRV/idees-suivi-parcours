@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { daysUntil, urgC, fmt } from "../lib/utils";
+import { daysUntil, urgC, fmt, getScopeIds } from "../lib/utils";
 import { Card } from "../components/ui";
 
 // ─── Filtre multi-sélection (chips) ──────────────────────────────────────────
@@ -43,19 +43,26 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
   const [selActivite, setSelActivite] = useState([]);
   const [selSite,     setSelSite]     = useState([]);
 
-  const filialesList  = [...new Set(sites.map(s => s.filiale).filter(Boolean))].sort();
+  // ── Sites accessibles selon le rôle (base des filtres hiérarchiques) ────────
+  const accessibleSites = useMemo(() => {
+    if (user.role === "admin") return sites;
+    const ids = getScopeIds(user, sites);
+    return ids ? sites.filter(s => ids.includes(s.id)) : sites;
+  }, [user, sites]);
+
+  const filialesList  = [...new Set(accessibleSites.map(s => s.filiale).filter(Boolean))].sort();
   const secteursList  = [...new Set(
-    sites.filter(s => !selFiliale.length || selFiliale.includes(s.filiale))
+    accessibleSites.filter(s => !selFiliale.length || selFiliale.includes(s.filiale))
       .map(s => s.secteur).filter(Boolean)
   )].sort();
   const activitesList = [...new Set(
-    sites.filter(s =>
+    accessibleSites.filter(s =>
       (!selFiliale.length  || selFiliale.includes(s.filiale)) &&
       (!selSecteur.length  || selSecteur.includes(s.secteur))
     ).map(s => s.activite).filter(Boolean)
   )].sort();
   const sitesList = [...new Set(
-    sites.filter(s =>
+    accessibleSites.filter(s =>
       (!selFiliale.length  || selFiliale.includes(s.filiale))  &&
       (!selSecteur.length  || selSecteur.includes(s.secteur))  &&
       (!selActivite.length || selActivite.includes(s.activite))
@@ -64,18 +71,17 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
 
   const filteredSiteIds = useMemo(() => {
     if (!selFiliale.length && !selSecteur.length && !selActivite.length && !selSite.length) return null;
-    return sites.filter(s =>
+    return accessibleSites.filter(s =>
       (!selFiliale.length  || selFiliale.includes(s.filiale))  &&
       (!selSecteur.length  || selSecteur.includes(s.secteur))  &&
       (!selActivite.length || selActivite.includes(s.activite)) &&
       (!selSite.length     || selSite.includes(s.nom))
     ).map(s => s.id);
-  }, [sites, selFiliale, selSecteur, selActivite, selSite]);
+  }, [accessibleSites, selFiliale, selSecteur, selActivite, selSite]);
 
   // ── Périmètre salarié ────────────────────────────────────────────────────
-  const base = user.role === "admin"
-    ? salaries
-    : salaries.filter(s => s.site_id === user.site_id);
+  const scopeIds = getScopeIds(user, sites);
+  const base = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
 
   const mine   = filteredSiteIds ? base.filter(s => filteredSiteIds.includes(s.site_id)) : base;
   const actifs = mine.filter(s => !s.dateSortie);
@@ -120,7 +126,8 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
     { l: "Objectifs en retard", v: nbRetard,         c: nbRetard > 0         ? "border-orange-300" : "border-gray-200",   p: "planning" },
   ];
 
-  const showFilters = user.role === "admin" && filialesList.length > 0;
+  // Montrer les filtres dès qu'il y a plus d'un site accessible (tous rôles)
+  const showFilters = accessibleSites.length > 1;
 
   return (
     <div className="p-6">

@@ -1,6 +1,6 @@
 import { useState, useMemo } from "react";
 import { PRESCRIPTEURS, TYPES_SORTIE, NIVEAUX_LANGUE, MOYENS_TRANSPORT } from "../lib/constants";
-import { getAge, dureeM } from "../lib/utils";
+import { getAge, dureeM, getScopeIds } from "../lib/utils";
 
 // ─── Palette couleurs pour les camemberts ─────────────────────────────────────
 const PALETTE = [
@@ -212,9 +212,8 @@ export default function Stats({ user, salaries, sites = [] }) {
 
   // ── Filtrage de la liste principale ──────────────────────────────────────────
   const allFiltered = useMemo(() => {
-    let base = user.role === "admin"
-      ? salaries
-      : salaries.filter(s => s.site_id === user.site_id);
+    const scopeIds = getScopeIds(user, sites);
+    let base = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
 
     // Filtre hiérarchique
     if (filteredSiteIds !== null) {

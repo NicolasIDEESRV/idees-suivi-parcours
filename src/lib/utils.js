@@ -32,3 +32,19 @@ export const urgC = days => {
   if (days <= 60) return "text-yellow-700 bg-yellow-50 border-yellow-200";
   return "text-green-700 bg-green-50 border-green-200";
 };
+
+/**
+ * Retourne la liste des site_id accessibles par cet utilisateur :
+ *  - admin     → null (pas de filtre, accès à tout)
+ *  - direction → tous les sites listés dans user.site_ids
+ *  - cip       → tous les sites listés dans user.site_ids
+ *
+ * Note : site_ids est prioritaire sur l'ancien champ site_id (mono-site).
+ */
+export function getScopeIds(user, _sites) {
+  if (user.role === "admin") return null;
+  // Utilise le tableau multi-sites s'il est renseigné
+  if (Array.isArray(user.site_ids) && user.site_ids.length > 0) return user.site_ids;
+  // Fallback sur l'ancien champ mono-site
+  return user.site_id ? [user.site_id] : [];
+}

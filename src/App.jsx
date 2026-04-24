@@ -14,6 +14,7 @@ import FicheSalarie from "./pages/FicheSalarie";
 import VuePreco     from "./pages/VuePreco";
 import ListeSalaries from "./pages/ListeSalaries";
 import Stats        from "./pages/Stats";
+import Export       from "./pages/Export";
 import Admin        from "./pages/Admin";
 
 
@@ -154,7 +155,7 @@ function AppInner({ user, onLogout }) {
       )}
       {page === "planning" && (
         <Planning
-          user={user} salaries={salaries} entretiens={entretiens}
+          user={user} salaries={salaries} sites={sites} entretiens={entretiens}
           users={profiles} setPage={navigate} setSelectedSalarie={setSel}
         />
       )}
@@ -186,6 +187,12 @@ function AppInner({ user, onLogout }) {
       )}
       {page === "stats" && (
         <Stats user={user} salaries={salaries} sites={sites} />
+      )}
+      {page === "export" && (
+        <Export
+          user={user} salaries={salaries} entretiens={entretiens}
+          sites={sites} profiles={profiles}
+        />
       )}
       {page === "admin" && (
         <Admin user={user} sites={sites} />

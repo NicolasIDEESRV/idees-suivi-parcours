@@ -9,6 +9,7 @@ export default function Layout({ user, children, page, setPage, onLogout }) {
     { id: "preco",     icon: "📋", label: "Vue PRECO" },
     { id: "salaries",  icon: "👥", label: "Salariés" },
     { id: "stats",     icon: "📊", label: "Statistiques" },
+    { id: "export",    icon: "⬇", label: "Export" },
     ...(user.role === "admin" ? [{ id: "admin", icon: "⚙", label: "Admin" }] : []),
   ];
   const logo = user.role === "admin" ? LOGOS.groupe : (LOGOS[user.site_id] || LOGOS.groupe);
