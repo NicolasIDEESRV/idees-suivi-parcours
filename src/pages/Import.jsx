@@ -21,6 +21,87 @@ const SKIP_COLS = new Set([
   "domaines_pro_1", "domaines_pro_2", "domaines_pro_3",
 ]);
 
+// ─── Validation / normalisation ───────────────────────────────────────────────
+
+const UUID_RE  = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const DATE_RE  = /^\d{4}-\d{2}-\d{2}$/;
+const UUID_COLS = new Set(["site_id","cip_id","assigned_to"]);
+const DATE_COLS = new Set(["date_naissance","date_entree","date_sortie","date_fin_contrat","date_fin_agrement","date_premier_inscription","css_jusqu_au","rappel_jusqu_au","date_bilan","date_first_emploi"]);
+
+// Valeurs acceptées par chaque enum Supabase
+const ENUM_VALID = {
+  moyen_transport: new Set(["Transports en commun","Voiture (permis B)","Voiture sans permis","Vélo","Trottinette","À pied","Covoiturage","Autre"]),
+  niveau_langue:   new Set(["Débutant","A1","A2","B1","B2","C1","Natif"]),
+  niveau_formation: new Set(["Niveau 3 (CAP/BEP et moins)","Niveau 4 (Bac ou Bac pro)","Niveau 5 à 8 (Bac+2 et +)"]),
+  prescripteur:    new Set(["FRANCE TRAVAIL","SERVICES SOCIAUX","CAP EMPLOI","MISSION LOCALE","PLIE","SIAE","SERVICES DE JUSTICE","SANS PRESCRIPTION","AUTRE"]),
+  statut_accueil:  new Set(["Accueilli","Inscrit","En attente"]),
+};
+
+// Correspondances courantes saisies dans les fichiers → valeur DB exacte
+const TRANSPORT_MAP = {
+  "transport en commun":   "Transports en commun",
+  "transports en commun":  "Transports en commun",
+  "voiture":               "Voiture (permis B)",
+  "voiture permis b":      "Voiture (permis B)",
+  "trotinette":            "Trottinette",
+  "trottinette":           "Trottinette",
+  "scooter":               "Autre",
+  "moto":                  "Autre",
+  "velo":                  "Vélo",
+  "vélo":                  "Vélo",
+  "a pied":                "À pied",
+  "à pied":                "À pied",
+  "covoiturage":           "Covoiturage",
+};
+
+const normalizeTransport = (v) => {
+  if (!v || v === "0") return null;
+  const s = String(v).trim();
+  if (ENUM_VALID.moyen_transport.has(s)) return s;
+  const mapped = TRANSPORT_MAP[s.toLowerCase()];
+  return mapped ?? null; // distance ou valeur inconnue → null
+};
+
+const normalizeEnum = (col, v) => {
+  if (!v) return null;
+  const set = ENUM_VALID[col];
+  if (!set) return String(v).trim() || null;
+  const s = String(v).trim();
+  return set.has(s) ? s : null;
+};
+
+const normalizeDate = (v) => {
+  if (v === null || v === undefined || v === "") return null;
+  // Nombre de série Excel
+  if (typeof v === "number") {
+    try {
+      const d = XLSX.SSF.parse_date_code(v);
+      if (d) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
+    } catch { return null; }
+  }
+  // Objet Date (cellDates:true)
+  if (v instanceof Date) {
+    const iso = v.toISOString().slice(0,10);
+    return DATE_RE.test(iso) ? iso : null;
+  }
+  const s = String(v).trim();
+  return DATE_RE.test(s) ? s : null; // "indéterminé" etc. → null
+};
+
+const normalizeUUID = (v) => {
+  const s = String(v ?? "").trim();
+  return UUID_RE.test(s) ? s : null;
+};
+
+// Détecte si une ligne est une ligne de données réelles (pas légende, pas entête)
+const isDataRow = (row, headers) => {
+  const nomIdx = headers.indexOf("nom");
+  const nom = nomIdx >= 0 ? String(row[headers[nomIdx]] ?? "") : "";
+  // Ignorer lignes vides, legendes, notes, saisie manuelle
+  if (!nom || nom.includes("✏") || nom.startsWith("Légende") || nom.startsWith("NOTE") || nom.toUpperCase() === "NOM") return false;
+  return true;
+};
+
 // Convertit une valeur texte booléenne en vrai booléen
 const parseBool = (v) => {
   if (v === true || v === false) return v;
@@ -39,29 +120,33 @@ const BOOL_COLS = new Set([
 ]);
 
 // Convertit une ligne Excel (objet {header: valeur}) en payload Supabase
-function rowToPayload(row, siteIdOverride, cipIdOverride) {
+function rowToPayload(row, siteIdOverride) {
   const payload = {};
 
   for (const [key, rawVal] of Object.entries(row)) {
     if (SKIP_COLS.has(key)) continue;
-    if (key === "" || key === undefined) continue;
+    if (!key || key === "") continue;
 
-    let val = rawVal === undefined || rawVal === "" ? null : rawVal;
+    let val = (rawVal === undefined || rawVal === "" || rawVal === null) ? null : rawVal;
 
+    // UUIDs
+    if (UUID_COLS.has(key)) { val = normalizeUUID(val); }
+    // Dates
+    else if (DATE_COLS.has(key)) { val = normalizeDate(val); }
     // Booleans
-    if (BOOL_COLS.has(key) && val !== null) {
-      val = parseBool(val);
-    }
+    else if (BOOL_COLS.has(key)) { val = val !== null ? parseBool(val) : null; }
     // Nombres
-    if ((key === "nb_enfants" || key === "revenus" || key === "charges" || key === "duree_chomage_mois" || key === "heures_travaillees") && val !== null) {
-      val = Number(val) || 0;
+    else if (["nb_enfants","revenus","charges","duree_chomage_mois","heures_travaillees"].includes(key)) {
+      val = val !== null ? (Number(val) || 0) : 0;
     }
-    // Dates : s'assurer que c'est une string YYYY-MM-DD
-    if (typeof val === "number" && (key.startsWith("date_") || key.endsWith("_au"))) {
-      // ExcelJS stocke parfois les dates comme des numéros de série
-      const d = XLSX.SSF.parse_date_code(val);
-      if (d) val = `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
-    }
+    // Enums spécifiques
+    else if (key === "moyen_transport")   { val = normalizeTransport(val); }
+    else if (key === "niveau_langue")     { val = normalizeEnum("niveau_langue", val); }
+    else if (key === "niveau_formation")  { val = normalizeEnum("niveau_formation", val); }
+    else if (key === "prescripteur")      { val = normalizeEnum("prescripteur", val) ?? "FRANCE TRAVAIL"; }
+    else if (key === "statut_accueil")    { val = normalizeEnum("statut_accueil", val) ?? "Inscrit"; }
+    // Textes : forcer string ou null
+    else if (val !== null) { val = typeof val === "object" ? null : String(val).trim() || null; }
 
     payload[key] = val;
   }
@@ -79,9 +164,21 @@ function rowToPayload(row, siteIdOverride, cipIdOverride) {
     row.domaines_pro_3 || "",
   ].filter(Boolean);
 
-  // Overrides site / CIP
+  // Champs calculés
+  payload.freins_entree = {};
+  for (const [dbKey, appKey] of Object.entries(FREIN_MAP)) {
+    const v = row[dbKey];
+    if (v && v !== "") payload.freins_entree[appKey] = v;
+  }
+
+  payload.domaines_pro = [
+    row.domaines_pro_1 || "",
+    row.domaines_pro_2 || "",
+    row.domaines_pro_3 || "",
+  ].filter(Boolean);
+
+  // Override site
   if (siteIdOverride) payload.site_id = siteIdOverride;
-  if (cipIdOverride)  payload.cip_id  = cipIdOverride;
 
   return payload;
 }
@@ -127,9 +224,11 @@ export default function Import({ user, sites }) {
           throw new Error("Ligne 1 introuvable : assurez-vous que la ligne 1 contient les noms de colonnes DB (ex: nom, prenom, date_entree…).");
         }
 
-        // Lignes de données (sauter la ligne 3 si c'est l'exemple)
+        // Lignes de données : sauter exemple, légendes, lignes vides
         const dataRows = aoa.slice(2).filter((r, i) => {
-          if (i === 0 && String(r[0]).includes("EXEMPLE")) return false;
+          const first = String(r[0] ?? "");
+          if (i === 0 && first.includes("EXEMPLE")) return false;
+          if (first.includes("✏") || first.startsWith("Légende") || first.startsWith("NOTE")) return false;
           return r.some(c => c !== "" && c !== null && c !== undefined);
         });
 
@@ -173,7 +272,7 @@ export default function Import({ user, sites }) {
 
     for (const row of rows) {
       try {
-        const payload = rowToPayload(row, siteOver || null, null);
+        const payload = rowToPayload(row, siteOver || null);
 
         // Valider champs obligatoires
         if (!payload.nom || !payload.prenom) {
