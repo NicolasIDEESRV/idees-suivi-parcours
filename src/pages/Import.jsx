@@ -297,6 +297,9 @@ export default function Import({ user, sites }) {
       try {
         const payload = rowToPayload(row, siteOver || null);
 
+        // cip_id NOT NULL : si absent/invalide dans le fichier, utiliser l'utilisateur connecté
+        if (!payload.cip_id) payload.cip_id = user.id;
+
         // Valider champs obligatoires
         if (!payload.nom || !payload.prenom) {
           errors.push({ nom: payload.nom || "(vide)", err: "Nom ou prénom manquant" });
