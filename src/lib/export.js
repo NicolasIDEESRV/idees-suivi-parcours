@@ -288,7 +288,7 @@ export function exportStats({ salaries, entretiens, sites, scopeIds, dateDebut, 
   XLSX.utils.book_append_sheet(wb, sheetSite,      "Par site");
   XLSX.utils.book_append_sheet(wb, sheetSortie,    "Types de sortie");
   XLSX.utils.book_append_sheet(wb, sheetPresc,     "Prescripteurs");
-  XLSX.utils.book_append_sheet(wb, sheetEntTypes,  "Entretiens / types");
+  XLSX.utils.book_append_sheet(wb, sheetEntTypes,  "Entretiens - types");
 
   const filename = `export_stats_${dateDebut || "tout"}_${dateFin || "tout"}.xlsx`;
   XLSX.writeFile(wb, filename);
