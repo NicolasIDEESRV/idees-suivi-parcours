@@ -498,13 +498,12 @@ function InviteForm({ sites }) {
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`,
+        `/api/invite-user`,
         {
           method: "POST",
           headers: {
             "Content-Type":  "application/json",
             "Authorization": `Bearer ${session.access_token}`,
-            "apikey":        import.meta.env.VITE_SUPABASE_ANON_KEY,
           },
           body: JSON.stringify({
             email:    email.trim(),
