@@ -71,21 +71,31 @@ const normalizeEnum = (col, v) => {
 };
 
 const normalizeDate = (v) => {
-  if (v === null || v === undefined || v === "") return null;
-  // Nombre de série Excel
-  if (typeof v === "number") {
+  if (v === null || v === undefined || v === "" || v === 0 || v === "0") return null;
+  // Nombre de série Excel (> 0 pour éviter la date 0 = 1900-01-00)
+  if (typeof v === "number" && v > 0) {
     try {
       const d = XLSX.SSF.parse_date_code(v);
-      if (d) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
+      if (d && d.y > 1900) return `${d.y}-${String(d.m).padStart(2,"0")}-${String(d.d).padStart(2,"0")}`;
     } catch { return null; }
+    return null;
   }
   // Objet Date (cellDates:true)
-  if (v instanceof Date) {
+  if (v instanceof Date && !isNaN(v)) {
     const iso = v.toISOString().slice(0,10);
     return DATE_RE.test(iso) ? iso : null;
   }
   const s = String(v).trim();
-  return DATE_RE.test(s) ? s : null; // "indéterminé" etc. → null
+  return DATE_RE.test(s) ? s : null; // "indéterminé", "CI", etc. → null
+};
+
+// Normalise le sexe → uniquement 'M', 'F' ou null
+const normalizeSexe = (v) => {
+  if (!v) return null;
+  const s = String(v).trim().toUpperCase();
+  if (s === "M" || s === "MASCULIN" || s === "MALE" || s === "HOMME") return "M";
+  if (s === "F" || s === "FÉMININ" || s === "FEMININ" || s === "FEMALE" || s === "FEMME") return "F";
+  return null;
 };
 
 const normalizeUUID = (v) => {
@@ -140,6 +150,7 @@ function rowToPayload(row, siteIdOverride) {
       val = val !== null ? (Number(val) || 0) : 0;
     }
     // Enums spécifiques
+    else if (key === "sexe")             { val = normalizeSexe(val); }
     else if (key === "moyen_transport")   { val = normalizeTransport(val); }
     else if (key === "niveau_langue")     { val = normalizeEnum("niveau_langue", val); }
     else if (key === "niveau_formation")  { val = normalizeEnum("niveau_formation", val); }
@@ -150,19 +161,6 @@ function rowToPayload(row, siteIdOverride) {
 
     payload[key] = val;
   }
-
-  // Champs calculés
-  payload.freins_entree = {};
-  for (const [dbKey, appKey] of Object.entries(FREIN_MAP)) {
-    const v = row[dbKey];
-    if (v && v !== "") payload.freins_entree[appKey] = v;
-  }
-
-  payload.domaines_pro = [
-    row.domaines_pro_1 || "",
-    row.domaines_pro_2 || "",
-    row.domaines_pro_3 || "",
-  ].filter(Boolean);
 
   // Champs calculés
   payload.freins_entree = {};
