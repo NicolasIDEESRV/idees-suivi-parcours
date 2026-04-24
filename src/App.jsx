@@ -48,7 +48,7 @@ function AppInner({ user, onLogout }) {
   const {
     sites, profiles, salaries, entretiens,
     loading, error,
-    handleSaveSal, handleConfirmJalons, handleSortie, handleDeleteSalarie, handleSaveEntretien,
+    handleSaveSal, handleConfirmJalons, handleSortie, handleDeleteSalarie, handleDeleteManySalaries, handleSaveEntretien,
     reload,
   } = useAppData(user);
 
@@ -171,6 +171,7 @@ function AppInner({ user, onLogout }) {
           user={user} salaries={salaries} sites={sites}
           setPage={navigate} setSelectedSalarie={setSel}
           onNew={() => setShowNew(true)} onOpenSortie={setSortSal}
+          onDeleteMany={handleDeleteManySalaries}
         />
       )}
       {page === "fiche" && sel && (

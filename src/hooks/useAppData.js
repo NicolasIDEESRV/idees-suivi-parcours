@@ -155,6 +155,17 @@ export function useAppData(user) {
   };
 
   /**
+   * Supprime plusieurs salariés en séquence (admin uniquement).
+   */
+  const handleDeleteManySalaries = async (ids) => {
+    for (const id of ids) {
+      await deleteSalarie(id);
+    }
+    setSalaries(prev => prev.filter(s => !ids.includes(s.id)));
+    setEntretiens(prev => prev.filter(e => !ids.includes(e.salarie_id)));
+  };
+
+  /**
    * Crée ou met à jour un entretien (+ ses objectifs + révisions).
    */
   const handleSaveEntretien = async (entretien) => {
@@ -181,6 +192,7 @@ export function useAppData(user) {
     handleConfirmJalons,
     handleSortie,
     handleDeleteSalarie,
+    handleDeleteManySalaries,
     handleSaveEntretien,
     // Utilitaire
     reload: loadAll,
