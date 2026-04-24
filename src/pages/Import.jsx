@@ -168,8 +168,8 @@ function rowToPayload(row, siteIdOverride) {
     if (UUID_COLS.has(key)) { val = normalizeUUID(val); }
     // Dates (liste explicite + détection dynamique par nom de colonne)
     else if (isDateCol(key)) { val = normalizeDate(val); }
-    // Booleans
-    else if (BOOL_COLS.has(key)) { val = val !== null ? parseBool(val) : null; }
+    // Booleans — NOT NULL DEFAULT false : toujours false si valeur absente/inconnue
+    else if (BOOL_COLS.has(key)) { val = parseBool(val) ?? false; }
     // Nombres
     else if (["nb_enfants","revenus","charges","duree_chomage_mois","heures_travaillees"].includes(key)) {
       val = val !== null ? (Number(val) || 0) : 0;
@@ -307,6 +307,10 @@ export default function Import({ user, sites }) {
         }
         if (!payload.site_id) {
           errors.push({ nom: `${payload.nom} ${payload.prenom}`, err: "site_id manquant — sélectionnez un site ci-dessus" });
+          continue;
+        }
+        if (!payload.date_entree) {
+          errors.push({ nom: `${payload.nom} ${payload.prenom}`, err: "date_entree manquante ou invalide (NOT NULL)" });
           continue;
         }
 
