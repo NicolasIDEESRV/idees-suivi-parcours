@@ -46,9 +46,16 @@ export default async function handler(req, res) {
     }
 
     // ── 3. Envoyer l'invitation avec la clé admin ────────────────────────────
+    // Accepte la clé en majuscules OU minuscules selon ce qui est configuré dans Vercel
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+                    || process.env.supabase_service_role_key;
+    if (!serviceKey) {
+      return res.status(500).json({ error: "SUPABASE_SERVICE_ROLE_KEY manquante dans les variables d'environnement Vercel." });
+    }
+
     const supabaseAdmin = createClient(
       process.env.VITE_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
+      serviceKey,
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
