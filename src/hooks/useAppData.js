@@ -93,9 +93,9 @@ export function useAppData(user) {
         : prev.map(s => s.id === saved.id ? saved : s)
     );
 
-    // Jalons obligatoires pour un nouveau salarié
+    // Jalons obligatoires pour un nouveau salarié (pas pour les candidats)
     let jalonsPersisted = [];
-    if (isNew) {
+    if (isNew && !saved.isCandidat && saved.dateEntree) {
       const jalonsBruts = genJalons(saved.dateEntree, saved.id, saved.cip_id);
       jalonsPersisted   = await createJalons(jalonsBruts);
       setEntretiens(prev => [...prev, ...jalonsPersisted]);

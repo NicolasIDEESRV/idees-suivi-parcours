@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth }     from "./contexts/AuthContext";
 import { AUTH_CALLBACK_TYPE } from "./lib/supabase";
 import { useAppData }  from "./hooks/useAppData";
+import { newSal }      from "./lib/data";
 import Layout          from "./components/Layout";
 import JalonConfirmModal        from "./components/JalonConfirmModal";
 import FormulaireNouveauSalarie from "./components/FormulaireNouveauSalarie";
@@ -13,6 +14,7 @@ import Planning     from "./pages/Planning";
 import FicheSalarie from "./pages/FicheSalarie";
 import VuePreco     from "./pages/VuePreco";
 import ListeSalaries from "./pages/ListeSalaries";
+import Candidats     from "./pages/Candidats";
 import Stats        from "./pages/Stats";
 import Import       from "./pages/Import";
 import Export       from "./pages/Export";
@@ -54,10 +56,11 @@ function AppInner({ user, onLogout }) {
 
   const [page,       setPage]       = useState("dashboard");
   const [sel,        setSel]        = useState(null);
-  const [showNew,    setShowNew]    = useState(false);
-  const [editSal,    setEditSal]    = useState(null);
-  const [sortSal,    setSortSal]    = useState(null);
-  const [jalonModal, setJalonModal] = useState(null); // { jalons[] }
+  const [showNew,      setShowNew]      = useState(false);
+  const [showNewCand,  setShowNewCand]  = useState(false);
+  const [editSal,      setEditSal]      = useState(null);
+  const [sortSal,      setSortSal]      = useState(null);
+  const [jalonModal,   setJalonModal]   = useState(null); // { jalons[] }
 
   const navigate = (p, s = null) => { if (s) setSel(s); setPage(p); };
 
@@ -112,7 +115,7 @@ function AppInner({ user, onLogout }) {
   return (
     <Layout
       user={user}
-      page={page === "fiche" ? "salaries" : page}
+      page={page === "fiche" ? (sel?.isCandidat ? "candidats" : "salaries") : page}
       setPage={navigate}
       onLogout={onLogout}
     >
@@ -134,6 +137,17 @@ function AppInner({ user, onLogout }) {
           user={user}
           onSave={onSaveSal}
           onClose={() => { setShowNew(false); setEditSal(null); }}
+        />
+      )}
+
+      {/* ── Formulaire nouveau candidat ── */}
+      {showNewCand && (
+        <FormulaireNouveauSalarie
+          initial={newSal({ site_id: user.site_id, cip_id: user.id, isCandidat: true, dateEntree: "" })}
+          sites={sites}
+          user={user}
+          onSave={onSaveSal}
+          onClose={() => setShowNewCand(false)}
         />
       )}
 
@@ -185,6 +199,14 @@ function AppInner({ user, onLogout }) {
             await handleDeleteSalarie(id);
             navigate("salaries");
           }}
+        />
+      )}
+      {page === "candidats" && (
+        <Candidats
+          user={user} salaries={salaries} sites={sites}
+          setPage={navigate} setSelectedSalarie={setSel}
+          onNew={() => setShowNewCand(true)}
+          onDeleteMany={handleDeleteManySalaries}
         />
       )}
       {page === "stats" && (

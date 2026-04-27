@@ -46,6 +46,7 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
   const scopeIds = getScopeIds(user, sites);
   const mine = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
   const list = mine.filter(s =>
+    !s.isCandidat &&   // les candidats sont gérés dans la page Candidats
     `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase()) &&
     (fs === "tous" || (fs === "actifs" && !s.dateSortie) || (fs === "sortis" && s.dateSortie))
   );

@@ -155,6 +155,17 @@ export const mapSalarieFromDB = (row) => ({
   synthBesoinsEntree: row.synth_besoins_entree ?? "",
   synthBesoinsSortie: row.synth_besoins_sortie ?? "",
   synthParcours:      row.synth_parcours       ?? "",
+
+  // Candidat
+  isCandidat:          row.is_candidat           ?? false,
+  candidatureRecueLe:  row.candidature_recue_le  ?? "",
+  appelerLe:           row.appeler_le             ?? "",
+  vuEntretienLe:       row.vu_entretien_le        ?? "",
+  impressionGlobale:   row.impression_globale     ?? "",
+  impressionDetail:    row.impression_detail      ?? "",
+  orientationCandidat: row.orientation_candidat   ?? "",
+  orientationMotif:    row.orientation_motif      ?? "",
+  orientationSiteId:   row.orientation_site_id    ?? null,
 });
 
 /** Objet JS → payload DB (null pour les champs vides, car Supabase préfère null) */
@@ -261,6 +272,17 @@ export const mapSalarieToDB = (obj) => ({
   synth_besoins_entree: obj.synthBesoinsEntree || null,
   synth_besoins_sortie: obj.synthBesoinsSortie || null,
   synth_parcours:       obj.synthParcours      || null,
+
+  // Candidat
+  is_candidat:           obj.isCandidat          ?? false,
+  candidature_recue_le:  obj.candidatureRecueLe  || null,
+  appeler_le:            obj.appelerLe           || null,
+  vu_entretien_le:       obj.vuEntretienLe       || null,
+  impression_globale:    obj.impressionGlobale   || null,
+  impression_detail:     obj.impressionDetail    || null,
+  orientation_candidat:  obj.orientationCandidat || null,
+  orientation_motif:     obj.orientationMotif    || null,
+  orientation_site_id:   obj.orientationSiteId   || null,
 });
 
 // ─── ENTRETIEN ────────────────────────────────────────────────────────────────

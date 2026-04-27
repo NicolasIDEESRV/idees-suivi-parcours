@@ -12,15 +12,19 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
   const upd  = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const updF = (t, f, v) => setForm(fm => ({ ...fm, [t]: { ...fm[t], [f]: v } }));
 
-  const STEPS = ["Identité & parcours", "Situation", "Formation & mobilité", "Freins & projet", "Résumé"];
-  const ok = form.nom && form.prenom && form.dateEntree && form.prescripteur;
+  const STEPS = form.isCandidat
+    ? ["Identité & parcours", "Situation", "Formation & mobilité", "Freins & projet", "Candidature", "Résumé"]
+    : ["Identité & parcours", "Situation", "Formation & mobilité", "Freins & projet", "Résumé"];
+  const ok = form.isCandidat
+    ? !!(form.nom && form.prenom)
+    : !!(form.nom && form.prenom && form.dateEntree && form.prescripteur);
 
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 100, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "2rem", overflowY: "auto" }}>
       <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl mb-8">
         <div className="flex items-center justify-between p-5 border-b border-gray-100">
           <div>
-            <h2 className="font-bold text-gray-900 text-lg">{initial?.id ? "Modifier" : "Nouveau salarié"}</h2>
+            <h2 className="font-bold text-gray-900 text-lg">{initial?.id ? "Modifier" : form.isCandidat ? "Nouveau candidat" : "Nouveau salarié"}</h2>
             <p className="text-sm text-gray-400">{STEPS[step]} — {step + 1}/{STEPS.length}</p>
           </div>
           <button onClick={onClose} className="text-gray-300 text-2xl">×</button>
@@ -186,7 +190,90 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
             </div>
           )}
 
-          {step === 4 && (
+          {/* ── Étape Candidature (candidats uniquement) ── */}
+          {step === 4 && form.isCandidat && (
+            <div className="space-y-5">
+              <div className="grid grid-cols-2 gap-4">
+                <FSec>Dates</FSec>
+                <FInput label="Candidature reçue le" type="date" value={form.candidatureRecueLe} onChange={e => upd("candidatureRecueLe", e.target.value)} />
+                <FInput label="Appeler le"           type="date" value={form.appelerLe}           onChange={e => upd("appelerLe",           e.target.value)} />
+                <FInput label="Vu en entretien le"   type="date" value={form.vuEntretienLe}       onChange={e => upd("vuEntretienLe",       e.target.value)} />
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Impression globale</p>
+                <div className="space-y-2">
+                  {[
+                    { val: "tres_bien", label: "Très bien",   sub: "Motivation claire, projet cohérent",          color: "border-green-300 hover:border-green-400" },
+                    { val: "bien",      label: "Bien",         sub: "Bon profil, quelques points à consolider",    color: "border-blue-300  hover:border-blue-400"  },
+                    { val: "doute",     label: "Doute sur…",   sub: "Réserve(s) identifiée(s) — préciser",         color: "border-orange-300 hover:border-orange-400" },
+                    { val: "decliner",  label: "À décliner",   sub: "Candidature non retenue",                     color: "border-red-300   hover:border-red-400"   },
+                  ].map(opt => (
+                    <label key={opt.val} className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${form.impressionGlobale === opt.val ? opt.color.split(" ")[0] + " bg-gray-50" : "border-gray-200 " + opt.color}`}>
+                      <input type="radio" name="impression" value={opt.val}
+                        checked={form.impressionGlobale === opt.val}
+                        onChange={() => upd("impressionGlobale", opt.val)}
+                        className="mt-0.5 accent-indigo-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{opt.label}</p>
+                        <p className="text-xs text-gray-400">{opt.sub}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {(form.impressionGlobale === "doute" || form.impressionGlobale === "decliner") && (
+                  <div className="mt-3">
+                    <FInput label={form.impressionGlobale === "doute" ? "Réserve(s) identifiée(s)" : "Motif de déclin"}
+                      value={form.impressionDetail} onChange={e => upd("impressionDetail", e.target.value)} />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Orientation</p>
+                <div className="space-y-2">
+                  {[
+                    { val: "recrute", label: "Recruté",   sub: "Intégration en CDDI ID'EES",                   color: "border-green-300 hover:border-green-400"  },
+                    { val: "vivier",  label: "Vivier",     sub: "Profil à rappeler lors d'une prochaine ouverture", color: "border-blue-300 hover:border-blue-400"   },
+                    { val: "interim", label: "Intérim ?",  sub: "À explorer via ID'EES Intérim",                color: "border-purple-300 hover:border-purple-400" },
+                    { val: "decliner",label: "Décliner",   sub: "Motif à préciser ci-dessous",                  color: "border-red-300 hover:border-red-400"       },
+                  ].map(opt => (
+                    <label key={opt.val} className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${form.orientationCandidat === opt.val ? opt.color.split(" ")[0] + " bg-gray-50" : "border-gray-200 " + opt.color}`}>
+                      <input type="radio" name="orientation" value={opt.val}
+                        checked={form.orientationCandidat === opt.val}
+                        onChange={() => upd("orientationCandidat", opt.val)}
+                        className="mt-0.5 accent-indigo-600" />
+                      <div>
+                        <p className="text-sm font-semibold text-gray-800">{opt.label}</p>
+                        <p className="text-xs text-gray-400">{opt.sub}</p>
+                      </div>
+                    </label>
+                  ))}
+                </div>
+                {(form.orientationCandidat === "decliner" || form.orientationCandidat === "vivier") && (
+                  <div className="mt-3">
+                    <FInput label={form.orientationCandidat === "decliner" ? "Motif de déclin" : "Note vivier"}
+                      value={form.orientationMotif} onChange={e => upd("orientationMotif", e.target.value)} />
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Orientation SECTEUR</p>
+                <FSelect label="Site / Activité cible" value={form.orientationSiteId || ""} onChange={e => upd("orientationSiteId", e.target.value || null)}>
+                  <option value="">— Sélectionner un site —</option>
+                  {sites.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
+                    </option>
+                  ))}
+                </FSelect>
+              </div>
+            </div>
+          )}
+
+          {/* ── Résumé salarié ── */}
+          {step === STEPS.length - 1 && !form.isCandidat && (
             <div className="space-y-4">
               <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                 <h3 className="font-semibold text-indigo-900 mb-3">Récapitulatif</h3>
@@ -212,6 +299,24 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                 ))}
               </div>
               {!ok && <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-3">⚠ Champs obligatoires manquants.</p>}
+            </div>
+          )}
+
+          {/* ── Résumé candidat ── */}
+          {step === STEPS.length - 1 && form.isCandidat && (
+            <div className="space-y-4">
+              <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                <h3 className="font-semibold text-purple-900 mb-3">Récapitulatif candidat</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div><span className="text-gray-500">Nom :</span> <strong>{form.nom} {form.prenom}</strong></div>
+                  <div><span className="text-gray-500">Candidature :</span> {fmt(form.candidatureRecueLe) || "—"}</div>
+                  <div><span className="text-gray-500">À appeler :</span> {fmt(form.appelerLe) || "—"}</div>
+                  <div><span className="text-gray-500">Entretien :</span> {fmt(form.vuEntretienLe) || "—"}</div>
+                  <div><span className="text-gray-500">Impression :</span> {form.impressionGlobale || "—"}</div>
+                  <div><span className="text-gray-500">Orientation :</span> {form.orientationCandidat || "—"}</div>
+                </div>
+              </div>
+              {!ok && <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-3">⚠ NOM et Prénom sont obligatoires.</p>}
             </div>
           )}
         </div>

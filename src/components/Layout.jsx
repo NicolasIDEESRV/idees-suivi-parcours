@@ -8,6 +8,7 @@ export default function Layout({ user, children, page, setPage, onLogout }) {
     { id: "planning",  icon: "📅", label: "Planning" },
     { id: "preco",     icon: "📋", label: "Vue PRECO" },
     { id: "salaries",  icon: "👥", label: "Salariés" },
+    { id: "candidats", icon: "👤", label: "Candidats" },
     { id: "stats",     icon: "📊", label: "Statistiques" },
     { id: "import",    icon: "⬆", label: "Import" },
     { id: "export",    icon: "⬇", label: "Export" },

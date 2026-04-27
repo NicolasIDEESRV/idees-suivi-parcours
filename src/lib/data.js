@@ -39,6 +39,11 @@ export const newSal = (o = {}) => ({
   typeSortie: "", situationSortie: "", dateFirstEmploi: "",
   accordSuiviPost: false, accordTransmission: false, aRappeler: false,
   synthBesoinsEntree: "", synthBesoinsSortie: "", synthParcours: "",
+  // Candidat
+  isCandidat: false,
+  candidatureRecueLe: "", appelerLe: "", vuEntretienLe: "",
+  impressionGlobale: "", impressionDetail: "",
+  orientationCandidat: "", orientationMotif: "", orientationSiteId: null,
   ...o,
 });
 
