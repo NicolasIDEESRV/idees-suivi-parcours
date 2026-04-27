@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { getProfiles, updateProfile } from "../lib/api/profiles";
+import { getHeuresMensuelles, upsertHeuresMensuelles } from "../lib/api/heures";
 import { FInput, FSelect } from "../components/ui";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -588,6 +589,242 @@ function InviteForm({ sites }) {
   );
 }
 
+// ─── Heures mensuelles (ETPI / ETPP) ─────────────────────────────────────────
+const MOIS_LABELS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+
+function KpiEtp({ label, heures, color }) {
+  const etp = heures / 1820;
+  return (
+    <div className={`rounded-xl border p-4 text-center ${color === "indigo" ? "bg-indigo-50 border-indigo-200" : "bg-emerald-50 border-emerald-200"}`}>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className={`text-2xl font-bold ${color === "indigo" ? "text-indigo-700" : "text-emerald-700"}`}>{etp.toFixed(2)}</p>
+      <p className="text-xs text-gray-400 mt-0.5">{heures.toFixed(0)} h / 1820</p>
+    </div>
+  );
+}
+
+function HeuresMensuelles({ sites }) {
+  const anneeActuelle = new Date().getFullYear();
+  const [annee, setAnnee]   = useState(anneeActuelle);
+  const [mois,  setMois]    = useState(new Date().getMonth() + 1); // 1–12
+  const [rows,  setRows]    = useState([]);   // données DB pour l'année
+  const [edits, setEdits]   = useState({});   // modifications locales en cours
+  const [saving, setSaving] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [err, setErr]       = useState("");
+
+  const activeSites = sites.filter(s => s.actif !== false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setErr("");
+    try {
+      setRows(await getHeuresMensuelles(annee));
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setLoading(false);
+    }
+  }, [annee]);
+
+  useEffect(() => { load(); setEdits({}); }, [load]);
+
+  // Récupère la valeur DB pour un site+mois
+  const getDbRow = (siteId, m) =>
+    rows.find(r => r.site_id === siteId && r.mois === m) ?? null;
+
+  // Clé unique pour les éditions locales
+  const eKey = (siteId, m) => `${siteId}_${m}`;
+
+  // Valeurs affichées : édition locale > DB > 0
+  const getVal = (siteId, m) => {
+    const k = eKey(siteId, m);
+    if (edits[k]) return edits[k];
+    const r = getDbRow(siteId, m);
+    return {
+      nb_salaries_insertion: r?.nb_salaries_insertion ?? 0,
+      heures_insertion:      r?.heures_insertion      ?? 0,
+      nb_permanents:         r?.nb_permanents         ?? 0,
+      heures_permanents:     r?.heures_permanents     ?? 0,
+    };
+  };
+
+  const setVal = (siteId, m, field, raw) => {
+    const k = eKey(siteId, m);
+    setEdits(prev => ({
+      ...prev,
+      [k]: { ...getVal(siteId, m), [field]: parseFloat(raw) || 0 },
+    }));
+  };
+
+  const isDirty = (siteId, m) => !!edits[eKey(siteId, m)];
+
+  const save = async (siteId, m) => {
+    const k = eKey(siteId, m);
+    if (!edits[k]) return;
+    setSaving(p => ({ ...p, [k]: true }));
+    setErr("");
+    try {
+      await upsertHeuresMensuelles({ site_id: siteId, annee, mois: m, ...edits[k] });
+      await load();
+      setEdits(p => { const n = { ...p }; delete n[k]; return n; });
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(p => ({ ...p, [k]: false }));
+    }
+  };
+
+  // ── Totaux annuels ──
+  const totalHI = rows.reduce((s, r) => s + (r.heures_insertion   || 0), 0);
+  const totalHP = rows.reduce((s, r) => s + (r.heures_permanents  || 0), 0);
+
+  // Totaux du mois affiché
+  const moisRows  = activeSites.map(s => getVal(s.id, mois));
+  const moisHI    = moisRows.reduce((s, r) => s + (r.heures_insertion   || 0), 0);
+  const moisHP    = moisRows.reduce((s, r) => s + (r.heures_permanents  || 0), 0);
+
+  // Champs de saisie par site
+  const NumCell = ({ siteId, m, field, placeholder }) => {
+    const v = getVal(siteId, m)[field];
+    return (
+      <input
+        type="number" min="0" step="0.5"
+        value={v || ""}
+        placeholder={placeholder}
+        onChange={e => setVal(siteId, m, field, e.target.value)}
+        className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-right focus:outline-none focus:ring-2 focus:ring-indigo-200"
+      />
+    );
+  };
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+
+      {/* ── Sélecteur année ── */}
+      <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex items-center gap-2 border border-gray-200 rounded-xl overflow-hidden">
+          <button onClick={() => setAnnee(a => a - 1)}
+            className="px-3 py-2 text-gray-500 hover:bg-gray-50 text-sm font-bold">◀</button>
+          <span className="px-4 py-2 text-sm font-bold text-gray-900">{annee}</span>
+          <button onClick={() => setAnnee(a => a + 1)}
+            className="px-3 py-2 text-gray-500 hover:bg-gray-50 text-sm font-bold">▶</button>
+        </div>
+        <p className="text-xs text-gray-400">Saisissez les heures par mois et par site. ETPI = heures insertion / 1820 · ETPP = heures permanents / 1820.</p>
+      </div>
+
+      {/* ── KPI annuels ── */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="rounded-xl border bg-white border-gray-200 p-4 text-center">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Heures insertion</p>
+          <p className="text-2xl font-bold text-gray-800">{totalHI.toFixed(0)} h</p>
+          <p className="text-xs text-gray-400 mt-0.5">annuel</p>
+        </div>
+        <KpiEtp label="ETPI annuel" heures={totalHI} color="indigo" />
+        <div className="rounded-xl border bg-white border-gray-200 p-4 text-center">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Heures permanents</p>
+          <p className="text-2xl font-bold text-gray-800">{totalHP.toFixed(0)} h</p>
+          <p className="text-xs text-gray-400 mt-0.5">annuel</p>
+        </div>
+        <KpiEtp label="ETPP annuel" heures={totalHP} color="emerald" />
+      </div>
+
+      {/* ── Onglets mois ── */}
+      <div className="flex gap-1 flex-wrap border-b border-gray-200 pb-0">
+        {MOIS_LABELS.map((l, i) => {
+          const m = i + 1;
+          const hasData = activeSites.some(s => getDbRow(s.id, m));
+          return (
+            <button key={m} onClick={() => setMois(m)}
+              className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors relative ${
+                mois === m
+                  ? "border-indigo-600 text-indigo-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {l}
+              {hasData && <span className="absolute top-1 right-1 w-1.5 h-1.5 rounded-full bg-indigo-400" />}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* ── Tableau du mois sélectionné ── */}
+      {loading ? (
+        <div className="flex justify-center py-10">
+          <div className="w-6 h-6 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <p className="text-sm font-semibold text-gray-700">
+              {MOIS_LABELS[mois - 1]} {annee}
+            </p>
+            <div className="flex gap-4 text-xs text-gray-500">
+              <span>Insertion : <strong className="text-indigo-700">{moisHI.toFixed(0)} h</strong></span>
+              <span>Permanents : <strong className="text-emerald-700">{moisHP.toFixed(0)} h</strong></span>
+            </div>
+          </div>
+
+          <table className="w-full text-sm">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                <th className="text-left p-3 text-xs font-semibold text-gray-500 uppercase">Site</th>
+                <th className="text-right p-3 text-xs font-semibold text-indigo-500 uppercase">Nb sal. insertion</th>
+                <th className="text-right p-3 text-xs font-semibold text-indigo-500 uppercase">Heures insertion</th>
+                <th className="text-right p-3 text-xs font-semibold text-emerald-600 uppercase">Nb permanents</th>
+                <th className="text-right p-3 text-xs font-semibold text-emerald-600 uppercase">Heures perm.</th>
+                <th className="p-3 w-24" />
+              </tr>
+            </thead>
+            <tbody>
+              {activeSites.length === 0 && (
+                <tr><td colSpan={6} className="p-8 text-center text-gray-300 text-sm">Aucun site actif</td></tr>
+              )}
+              {activeSites.map(site => {
+                const k = eKey(site.id, mois);
+                const dirty = isDirty(site.id, mois);
+                const isSaving = saving[k];
+                return (
+                  <tr key={site.id} className={`border-b border-gray-50 ${dirty ? "bg-amber-50" : ""}`}>
+                    <td className="p-3">
+                      <p className="font-medium text-gray-800 text-xs">{site.nom}</p>
+                      {site.filiale && <p className="text-gray-400 text-xs">{site.filiale}</p>}
+                    </td>
+                    <td className="p-2">
+                      <NumCell siteId={site.id} m={mois} field="nb_salaries_insertion" placeholder="0" />
+                    </td>
+                    <td className="p-2">
+                      <NumCell siteId={site.id} m={mois} field="heures_insertion" placeholder="0.0" />
+                    </td>
+                    <td className="p-2">
+                      <NumCell siteId={site.id} m={mois} field="nb_permanents" placeholder="0" />
+                    </td>
+                    <td className="p-2">
+                      <NumCell siteId={site.id} m={mois} field="heures_permanents" placeholder="0.0" />
+                    </td>
+                    <td className="p-2 text-right">
+                      <button
+                        onClick={() => save(site.id, mois)}
+                        disabled={!dirty || isSaving}
+                        className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 text-white disabled:opacity-30 hover:bg-indigo-700 transition-colors"
+                      >
+                        {isSaving ? "…" : "Enreg."}
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {err && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{err}</p>}
+    </div>
+  );
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 export default function Admin({ user, sites }) {
   const [tab, setTab] = useState("invite");
@@ -599,6 +836,7 @@ export default function Admin({ user, sites }) {
   const tabs = [
     { id: "invite", label: "Inviter un utilisateur" },
     { id: "users",  label: "Gestion des utilisateurs" },
+    { id: "heures", label: "Heures insertion (ETPI/ETPP)" },
   ];
 
   return (
@@ -627,6 +865,7 @@ export default function Admin({ user, sites }) {
 
       {tab === "invite" && <InviteForm sites={sites} />}
       {tab === "users"  && <UserManagement sites={sites} />}
+      {tab === "heures" && <HeuresMensuelles sites={sites} />}
     </div>
   );
 }
