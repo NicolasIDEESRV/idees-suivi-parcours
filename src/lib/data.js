@@ -44,7 +44,12 @@ export const newSal = (o = {}) => ({
   candidatureRecueLe: "", appelerLe: "", vuEntretienLe: "",
   impressionGlobale: "", impressionDetail: "",
   orientationCandidat: "", orientationMotif: "", orientationSiteId: null,
+  interimPropose: false,
   activitesPrio: [],
+  // Entretien candidat — champs complémentaires
+  autreAccompagnateur: "", enRecherchDepuis: "",
+  pieceIdentite: "", titreSejourValidite: "",
+  contraintePhysique: "", contrainteHoraire: "",
   // Sécurité sociale
   numSecuSociale: "",
   ...o,
