@@ -15,16 +15,18 @@ const IMP_LABEL = {
   decliner:  "À décliner",
 };
 const ORI_STYLE = {
-  recrute:  "bg-green-100  text-green-800  border-green-200",
-  vivier:   "bg-blue-100   text-blue-800   border-blue-200",
-  interim:  "bg-purple-100 text-purple-800 border-purple-200",
-  decliner: "bg-red-100    text-red-800    border-red-200",
+  evaluation: "bg-orange-100 text-orange-800 border-orange-200",
+  recrute:    "bg-green-100  text-green-800  border-green-200",
+  vivier:     "bg-blue-100   text-blue-800   border-blue-200",
+  interim:    "bg-purple-100 text-purple-800 border-purple-200",
+  decliner:   "bg-red-100    text-red-800    border-red-200",
 };
 const ORI_LABEL = {
-  recrute:  "Recruté",
-  vivier:   "Vivier",
-  interim:  "Intérim ?",
-  decliner: "Décliner",
+  evaluation: "Évaluation",
+  recrute:    "Recruté",
+  vivier:     "Vivier",
+  interim:    "Intérim ?",
+  decliner:   "Décliner",
 };
 
 function Badge({ map, labelMap, value }) {

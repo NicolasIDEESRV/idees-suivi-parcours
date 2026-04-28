@@ -95,7 +95,10 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
   // ── Validation obligatoires ────────────────────────────────────────────────
   const okBase = !!(form.nom && form.prenom && form.telephone && form.numSecuSociale);
   const okCandidat = okBase && !!(form.candidatureRecueLe) && form.activitesPrio.length > 0 &&
-    (!form.vuEntretienLe || (form.impressionGlobale && form.orientationCandidat && form.orientationSiteId));
+    (!form.vuEntretienLe || (
+      form.impressionGlobale && form.orientationCandidat &&
+      (form.orientationCandidat === "evaluation" || form.orientationCandidat === "decliner" || form.orientationSiteId)
+    ));
   const okSal = okBase && !!(form.dateEntree && form.dateFinContrat && form.dateFinAgrement && form.site_id);
   const ok = form.isCandidat ? okCandidat : okSal;
 
@@ -405,10 +408,11 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                 </p>
                 <div className="space-y-2">
                   {[
-                    { val: "recrute",  label: "Recruté",   sub: "Intégration en CDDI ID'EES",                    color: "border-green-300"  },
-                    { val: "vivier",   label: "Vivier",     sub: "Profil à rappeler lors d'une prochaine ouverture", color: "border-blue-300"  },
-                    { val: "interim",  label: "Intérim ?",  sub: "À explorer via ID'EES Intérim",                 color: "border-purple-300" },
-                    { val: "decliner", label: "Décliner",   sub: "Motif à préciser ci-dessous",                   color: "border-red-300"    },
+                    { val: "evaluation", label: "Évaluation en cours", sub: "Entretien(s) en cours — décision à venir",       color: "border-orange-300"  },
+                    { val: "recrute",    label: "Recruté",              sub: "Intégration en CDDI ID'EES",                    color: "border-green-300"   },
+                    { val: "vivier",     label: "Vivier",               sub: "Profil à rappeler lors d'une prochaine ouverture", color: "border-blue-300" },
+                    { val: "interim",    label: "Intérim ?",            sub: "À explorer via ID'EES Intérim",                 color: "border-purple-300"  },
+                    { val: "decliner",   label: "Décliner",             sub: "Motif à préciser ci-dessous",                   color: "border-red-300"     },
                   ].map(opt => (
                     <label key={opt.val} className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${form.orientationCandidat === opt.val ? opt.color + " bg-gray-50" : "border-gray-200 hover:" + opt.color}`}>
                       <input type="radio" name="orientation" value={opt.val}
@@ -422,10 +426,18 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                     </label>
                   ))}
                 </div>
-                {(form.orientationCandidat === "decliner" || form.orientationCandidat === "vivier") && (
+                {form.orientationCandidat && form.orientationCandidat !== "recrute" && (
                   <div className="mt-3">
-                    <FInput label={form.orientationCandidat === "decliner" ? "Motif de déclin" : "Note vivier"}
-                      value={form.orientationMotif} onChange={e => upd("orientationMotif", e.target.value)} />
+                    <FInput
+                      label={
+                        form.orientationCandidat === "decliner"   ? "Motif de déclin" :
+                        form.orientationCandidat === "vivier"     ? "Note vivier" :
+                        form.orientationCandidat === "evaluation" ? "Étape d'évaluation (facultatif)" :
+                        "Précision"
+                      }
+                      value={form.orientationMotif}
+                      onChange={e => upd("orientationMotif", e.target.value)}
+                    />
                   </div>
                 )}
               </div>
