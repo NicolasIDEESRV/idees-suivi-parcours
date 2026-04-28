@@ -61,6 +61,7 @@ function AppInner({ user, onLogout }) {
   const [editSal,      setEditSal]      = useState(null);
   const [sortSal,      setSortSal]      = useState(null);
   const [jalonModal,   setJalonModal]   = useState(null); // { jalons[] }
+  const [convertCand,  setConvertCand]  = useState(null); // candidat à convertir
 
   const navigate = (p, s = null) => { if (s) setSel(s); setPage(p); };
 
@@ -69,6 +70,7 @@ function AppInner({ user, onLogout }) {
     try {
       const { salarie, jalonsPersisted } = await handleSaveSal(form);
       setShowNew(false);
+      setShowNewCand(false);
       setEditSal(null);
       if (page === "fiche") setSel(salarie);
       if (jalonsPersisted.length > 0) {
@@ -115,6 +117,7 @@ function AppInner({ user, onLogout }) {
   return (
     <Layout
       user={user}
+      sites={sites}
       page={page === "fiche" ? (sel?.isCandidat ? "candidats" : "salaries") : page}
       setPage={navigate}
       onLogout={onLogout}
@@ -126,6 +129,20 @@ function AppInner({ user, onLogout }) {
           users={profiles}
           onConfirm={onConfirmJalons}
           onClose={() => setJalonModal(null)}
+        />
+      )}
+
+      {/* ── Conversion candidat → salarié ── */}
+      {convertCand && (
+        <FormulaireNouveauSalarie
+          initial={{ ...convertCand, isCandidat: false }}
+          sites={sites}
+          user={user}
+          onSave={async (form) => {
+            await onSaveSal(form);
+            setConvertCand(null);
+          }}
+          onClose={() => setConvertCand(null)}
         />
       )}
 
@@ -207,6 +224,7 @@ function AppInner({ user, onLogout }) {
           setPage={navigate} setSelectedSalarie={setSel}
           onNew={() => setShowNewCand(true)}
           onDeleteMany={handleDeleteManySalaries}
+          onConvertToSalarie={setConvertCand}
         />
       )}
       {page === "stats" && (

@@ -66,7 +66,7 @@ function ConfirmDeleteModal({ count, onConfirm, onCancel, loading }) {
 }
 
 // ─── Composant principal ──────────────────────────────────────────────────────
-export default function Candidats({ user, salaries, sites = [], setPage, setSelectedSalarie, onNew, onDeleteMany }) {
+export default function Candidats({ user, salaries, sites = [], setPage, setSelectedSalarie, onNew, onDeleteMany, onConvertToSalarie }) {
   const [search,     setSearch]     = useState("");
   const [sortCol,    setSortCol]    = useState("candidatureRecueLe");
   const [sortDir,    setSortDir]    = useState(-1); // plus récents en premier
@@ -140,6 +140,7 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
     { label: "Impression",      col: "impressionGlobale" },
     { label: "Orientation",     col: "orientationCandidat" },
     { label: "Site cible",      col: null },
+    { label: "",                col: null },
   ];
 
   return (
@@ -236,12 +237,23 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
                   <td className="p-3"><Badge map={IMP_STYLE} labelMap={IMP_LABEL} value={s.impressionGlobale} /></td>
                   <td className="p-3"><Badge map={ORI_STYLE} labelMap={ORI_LABEL} value={s.orientationCandidat} /></td>
                   <td className="p-3 text-gray-400 text-xs">{s.orientationSiteId ? siteName(s.orientationSiteId) : "—"}</td>
+                  <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
+                    {!sel && onConvertToSalarie && (
+                      <button
+                        onClick={() => onConvertToSalarie(s)}
+                        className="text-xs text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 whitespace-nowrap font-medium"
+                        title="Convertir ce candidat en salarié"
+                      >
+                        → Salarié
+                      </button>
+                    )}
+                  </td>
                 </tr>
               );
             })}
             {candidats.length === 0 && (
               <tr>
-                <td colSpan={isAdmin ? 8 : 7} className="p-8 text-center text-gray-300">
+                <td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-gray-300">
                   Aucun candidat
                 </td>
               </tr>

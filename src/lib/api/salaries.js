@@ -95,6 +95,24 @@ export async function sortirSalarie(id, sortieForm) {
 }
 
 /**
+ * Vérifie que le numéro de sécurité sociale est unique (toutes filiales confondues).
+ * Retourne les doublons trouvés (tableau vide = unique).
+ * @param {string} numSecu
+ * @param {string|null} excludeId - ID du salarié à exclure (pour les modifications)
+ */
+export async function checkNumSecuUnique(numSecu, excludeId = null) {
+  if (!numSecu || !numSecu.trim()) return [];
+  let q = supabase
+    .from("salaries")
+    .select("id, nom, prenom, is_candidat, site_id")
+    .eq("num_secu_sociale", numSecu.trim());
+  if (excludeId) q = q.neq("id", excludeId);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
+/**
  * Supprime définitivement un salarié et toutes ses données (admin uniquement).
  * La suppression en cascade (entretiens, objectifs) est gérée par la DB.
  */

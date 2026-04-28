@@ -94,8 +94,11 @@ export function useAppData(user) {
     );
 
     // Jalons obligatoires pour un nouveau salarié (pas pour les candidats)
+    // OU lors de la conversion candidat → salarié
+    const existingSal = salaries.find(s => s.id === form.id);
+    const isConversion = existingSal?.isCandidat === true && form.isCandidat === false;
     let jalonsPersisted = [];
-    if (isNew && !saved.isCandidat && saved.dateEntree) {
+    if (!saved.isCandidat && saved.dateEntree && (isNew || isConversion)) {
       const jalonsBruts = genJalons(saved.dateEntree, saved.id, saved.cip_id);
       jalonsPersisted   = await createJalons(jalonsBruts);
       setEntretiens(prev => [...prev, ...jalonsPersisted]);

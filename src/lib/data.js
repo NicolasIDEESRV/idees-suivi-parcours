@@ -44,6 +44,9 @@ export const newSal = (o = {}) => ({
   candidatureRecueLe: "", appelerLe: "", vuEntretienLe: "",
   impressionGlobale: "", impressionDetail: "",
   orientationCandidat: "", orientationMotif: "", orientationSiteId: null,
+  activitesPrio: [],
+  // Sécurité sociale
+  numSecuSociale: "",
   ...o,
 });
 

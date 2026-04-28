@@ -166,6 +166,9 @@ export const mapSalarieFromDB = (row) => ({
   orientationCandidat: row.orientation_candidat   ?? "",
   orientationMotif:    row.orientation_motif      ?? "",
   orientationSiteId:   row.orientation_site_id    ?? null,
+  activitesPrio:       row.activites_prio         ?? [],
+  // Sécurité sociale
+  numSecuSociale:      row.num_secu_sociale       ?? "",
 });
 
 /** Objet JS → payload DB (null pour les champs vides, car Supabase préfère null) */
@@ -283,6 +286,9 @@ export const mapSalarieToDB = (obj) => ({
   orientation_candidat:  obj.orientationCandidat || null,
   orientation_motif:     obj.orientationMotif    || null,
   orientation_site_id:   obj.orientationSiteId   || null,
+  activites_prio:        obj.activitesPrio       ?? [],
+  // Sécurité sociale
+  num_secu_sociale:      obj.numSecuSociale      || null,
 });
 
 // ─── ENTRETIEN ────────────────────────────────────────────────────────────────

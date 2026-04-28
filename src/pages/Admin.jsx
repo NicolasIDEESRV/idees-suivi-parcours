@@ -605,15 +605,37 @@ function KpiEtp({ label, heures, color }) {
 
 function HeuresMensuelles({ sites }) {
   const anneeActuelle = new Date().getFullYear();
-  const [annee, setAnnee]   = useState(anneeActuelle);
-  const [mois,  setMois]    = useState(new Date().getMonth() + 1); // 1–12
-  const [rows,  setRows]    = useState([]);   // données DB pour l'année
-  const [edits, setEdits]   = useState({});   // modifications locales en cours
-  const [saving, setSaving] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [err, setErr]       = useState("");
+  const [annee,    setAnnee]   = useState(anneeActuelle);
+  const [mois,     setMois]    = useState(new Date().getMonth() + 1); // 1–12
+  const [rows,     setRows]    = useState([]);   // données DB pour l'année
+  const [edits,    setEdits]   = useState({});   // modifications locales en cours
+  const [saving,   setSaving]  = useState({});
+  const [loading,  setLoading] = useState(true);
+  const [err,      setErr]     = useState("");
+  // ── Filtres ──
+  const [fFiliale,  setFFiliale]  = useState("");
+  const [fSecteur,  setFSecteur]  = useState("");
+  const [fActivite, setFActivite] = useState("");
 
-  const activeSites = sites.filter(s => s.actif !== false);
+  const allActive = sites.filter(s => s.actif !== false);
+
+  // Listes de valeurs disponibles (pour les filtres)
+  const filialesList  = [...new Set(allActive.map(s => s.filiale).filter(Boolean))];
+  const secteursList  = [...new Set(
+    allActive.filter(s => !fFiliale  || s.filiale  === fFiliale)
+             .map(s => s.secteur).filter(Boolean)
+  )];
+  const activitesList = [...new Set(
+    allActive.filter(s => (!fFiliale || s.filiale === fFiliale) && (!fSecteur || s.secteur === fSecteur))
+             .map(s => s.activite).filter(Boolean)
+  )];
+
+  // Sites filtrés pour le tableau
+  const activeSites = allActive.filter(s =>
+    (!fFiliale  || s.filiale  === fFiliale)  &&
+    (!fSecteur  || s.secteur  === fSecteur)  &&
+    (!fActivite || s.activite === fActivite)
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -675,9 +697,11 @@ function HeuresMensuelles({ sites }) {
     }
   };
 
-  // ── Totaux annuels ──
-  const totalHI = rows.reduce((s, r) => s + (r.heures_insertion   || 0), 0);
-  const totalHP = rows.reduce((s, r) => s + (r.heures_permanents  || 0), 0);
+  // ── Totaux annuels (filtrés sur les sites affichés) ──
+  const filteredSiteIds = new Set(activeSites.map(s => s.id));
+  const filteredRows = rows.filter(r => filteredSiteIds.has(r.site_id));
+  const totalHI = filteredRows.reduce((s, r) => s + (r.heures_insertion   || 0), 0);
+  const totalHP = filteredRows.reduce((s, r) => s + (r.heures_permanents  || 0), 0);
 
   // Totaux du mois affiché
   const moisRows  = activeSites.map(s => getVal(s.id, mois));
@@ -713,6 +737,67 @@ function HeuresMensuelles({ sites }) {
         <p className="text-xs text-gray-400">Saisissez les heures par mois et par site. ETPI = heures insertion / 1820 · ETPP = heures permanents / 1820.</p>
       </div>
 
+      {/* ── Filtres filiale / secteur / activité ── */}
+      {(filialesList.length > 1 || secteursList.length > 0 || activitesList.length > 0) && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+          <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">Filtrer l'affichage</p>
+          <div className="flex gap-3 flex-wrap items-end">
+            {filialesList.length > 1 && (
+              <div>
+                <label className="text-xs text-gray-400 font-medium block mb-1">Filiale</label>
+                <select
+                  value={fFiliale}
+                  onChange={e => { setFFiliale(e.target.value); setFSecteur(""); setFActivite(""); }}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Toutes</option>
+                  {filialesList.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+            )}
+            {secteursList.length > 0 && (
+              <div>
+                <label className="text-xs text-gray-400 font-medium block mb-1">Secteur</label>
+                <select
+                  value={fSecteur}
+                  onChange={e => { setFSecteur(e.target.value); setFActivite(""); }}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Tous</option>
+                  {secteursList.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+            {activitesList.length > 0 && (
+              <div>
+                <label className="text-xs text-gray-400 font-medium block mb-1">Activité</label>
+                <select
+                  value={fActivite}
+                  onChange={e => setFActivite(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Toutes</option>
+                  {activitesList.map(a => <option key={a} value={a}>{a}</option>)}
+                </select>
+              </div>
+            )}
+            {(fFiliale || fSecteur || fActivite) && (
+              <button
+                onClick={() => { setFFiliale(""); setFSecteur(""); setFActivite(""); }}
+                className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100"
+              >
+                ✕ Effacer les filtres
+              </button>
+            )}
+          </div>
+          {activeSites.length < allActive.length && (
+            <p className="text-xs text-indigo-600">
+              {activeSites.length} site{activeSites.length > 1 ? "s" : ""} affiché{activeSites.length > 1 ? "s" : ""} sur {allActive.length}
+            </p>
+          )}
+        </div>
+      )}
+
       {/* ── KPI annuels ── */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className="rounded-xl border bg-white border-gray-200 p-4 text-center">
@@ -733,7 +818,7 @@ function HeuresMensuelles({ sites }) {
       <div className="flex gap-1 flex-wrap border-b border-gray-200 pb-0">
         {MOIS_LABELS.map((l, i) => {
           const m = i + 1;
-          const hasData = activeSites.some(s => getDbRow(s.id, m));
+          const hasData = activeSites.some(s => filteredSiteIds.has(s.id) && getDbRow(s.id, m));
           return (
             <button key={m} onClick={() => setMois(m)}
               className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px transition-colors relative ${
