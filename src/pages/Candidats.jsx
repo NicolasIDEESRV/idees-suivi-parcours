@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { fmt, getScopeIds } from "../lib/utils";
 
-// ─── Badges impression / orientation ─────────────────────────────────────────
+// ─── Badges impression ────────────────────────────────────────────────────────
 const IMP_STYLE = {
   tres_bien: "bg-green-100 text-green-800 border-green-200",
   bien:      "bg-blue-100  text-blue-800  border-blue-200",
@@ -14,30 +14,30 @@ const IMP_LABEL = {
   doute:     "Doute",
   decliner:  "À décliner",
 };
+
+// ─── Badges orientation ───────────────────────────────────────────────────────
 const ORI_STYLE = {
   evaluation: "bg-orange-100 text-orange-800 border-orange-200",
   recrute:    "bg-green-100  text-green-800  border-green-200",
   vivier:     "bg-blue-100   text-blue-800   border-blue-200",
   decliner:   "bg-red-100    text-red-800    border-red-200",
-  // legacy
-  interim:    "bg-purple-100 text-purple-800 border-purple-200",
+  interim:    "bg-purple-100 text-purple-800 border-purple-200", // legacy
 };
 const ORI_LABEL = {
   evaluation: "Évaluation",
   recrute:    "Recruté",
   vivier:     "Vivier",
   decliner:   "Décliné",
-  // legacy
-  interim:    "Intérim (ancien)",
+  interim:    "Intérim (ancien)", // legacy
 };
 
-// ─── Onglets statut candidat ──────────────────────────────────────────────────
+// ─── Config onglets statut — couleurs en inline style pour éviter le purge Tailwind ──
 const STATUS_TABS = [
-  { key: null,         label: "Tous",                color: "text-gray-600",   activeBg: "bg-gray-100"    },
-  { key: "evaluation", label: "Évaluation",          color: "text-orange-700", activeBg: "bg-orange-100"  },
-  { key: "vivier",     label: "Vivier",              color: "text-blue-700",   activeBg: "bg-blue-100"    },
-  { key: "recrute",    label: "Recruté",             color: "text-green-700",  activeBg: "bg-green-100"   },
-  { key: "decliner",   label: "Décliné",             color: "text-red-700",    activeBg: "bg-red-100"     },
+  { key: "all",        label: "Tous",              hex: "#6B7280", bg: "#F3F4F6" },
+  { key: "evaluation", label: "Évaluation en cours", hex: "#D97706", bg: "#FEF3C7" },
+  { key: "vivier",     label: "Vivier",             hex: "#2563EB", bg: "#DBEAFE" },
+  { key: "recrute",    label: "Recruté",            hex: "#059669", bg: "#D1FAE5" },
+  { key: "decliner",   label: "Décliné",            hex: "#DC2626", bg: "#FEE2E2" },
 ];
 
 function Badge({ map, labelMap, value }) {
@@ -70,7 +70,7 @@ function ConfirmDeleteModal({ count, onConfirm, onCancel, loading }) {
             className="flex-1 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl py-2.5 text-sm font-semibold flex items-center justify-center gap-2">
             {loading
               ? <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Suppression…</>
-              : `🗑 Supprimer`}
+              : "🗑 Supprimer"}
           </button>
         </div>
       </div>
@@ -82,44 +82,41 @@ function ConfirmDeleteModal({ count, onConfirm, onCancel, loading }) {
 export default function Candidats({ user, salaries, sites = [], setPage, setSelectedSalarie, onNew, onDeleteMany, onConvertToSalarie }) {
   const [search,       setSearch]       = useState("");
   const [sortCol,      setSortCol]      = useState("candidatureRecueLe");
-  const [sortDir,      setSortDir]      = useState(-1); // plus récents en premier
+  const [sortDir,      setSortDir]      = useState(-1);
   const [selected,     setSelected]     = useState(new Set());
   const [confirmDel,   setConfirmDel]   = useState(false);
   const [deleting,     setDeleting]     = useState(false);
-  const [filterStatus, setFilterStatus] = useState(null);
+  const [filterStatus, setFilterStatus] = useState("all");
 
   const isAdmin = user.role === "admin";
-
-  // Seuls les candidats dans le périmètre de l'utilisateur
   const scopeIds = getScopeIds(user, sites);
-  const candidats = salaries.filter(s => {
+
+  // ── Filtrage ─────────────────────────────────────────────────────────────────
+  const allCandidats = salaries.filter(s => {
     if (!s.isCandidat) return false;
     if (scopeIds !== null && !scopeIds.includes(s.site_id)) return false;
-    if (filterStatus !== null && s.orientationCandidat !== filterStatus) return false;
+    return true;
+  });
+
+  const candidats = allCandidats.filter(s => {
+    if (filterStatus !== "all" && s.orientationCandidat !== filterStatus) return false;
     return `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase());
   });
 
-  // Comptages par statut pour les badges d'onglets
+  // Comptages par statut
   const countByStatus = STATUS_TABS.reduce((acc, t) => {
-    if (t.key === null) {
-      acc[null] = salaries.filter(s => {
-        if (!s.isCandidat) return false;
-        if (scopeIds !== null && !scopeIds.includes(s.site_id)) return false;
-        return true;
-      }).length;
+    if (t.key === "all") {
+      acc["all"] = allCandidats.length;
     } else {
-      acc[t.key] = salaries.filter(s => {
-        if (!s.isCandidat) return false;
-        if (scopeIds !== null && !scopeIds.includes(s.site_id)) return false;
-        return s.orientationCandidat === t.key;
-      }).length;
+      acc[t.key] = allCandidats.filter(s => s.orientationCandidat === t.key).length;
     }
     return acc;
   }, {});
 
+  // ── Tri ──────────────────────────────────────────────────────────────────────
   const sorted = [...candidats].sort((a, b) => {
-    let va = a[sortCol] ?? "";
-    let vb = b[sortCol] ?? "";
+    const va = a[sortCol] ?? "";
+    const vb = b[sortCol] ?? "";
     return String(va).localeCompare(String(vb), "fr") * sortDir;
   });
 
@@ -129,7 +126,7 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
   };
   const sortIcon = (col) => sortCol === col ? (sortDir === 1 ? " ↑" : " ↓") : " ↕";
 
-  // ── Sélection ───────────────────────────────────────────────────────────────
+  // ── Sélection ────────────────────────────────────────────────────────────────
   const allSelected  = candidats.length > 0 && candidats.every(s => selected.has(s.id));
   const someSelected = candidats.some(s => selected.has(s.id));
 
@@ -159,21 +156,20 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
     }
   };
 
-  // Helper site name
   const siteName = (siteId) => {
     const s = sites.find(x => x.id === siteId);
     return s ? [s.filiale, s.nom].filter(Boolean).join(" › ") : "—";
   };
 
   const cols = [
-    { label: "Candidat",        col: "nom" },
-    { label: "Candidature le",  col: "candidatureRecueLe" },
-    { label: "À appeler le",    col: "appelerLe" },
-    { label: "Entretien le",    col: "vuEntretienLe" },
-    { label: "Impression",      col: "impressionGlobale" },
-    { label: "Orientation",     col: "orientationCandidat" },
-    { label: "Site cible",      col: null },
-    { label: "",                col: null },
+    { label: "Candidat",       col: "nom"                  },
+    { label: "Candidature le", col: "candidatureRecueLe"   },
+    { label: "À appeler le",   col: "appelerLe"            },
+    { label: "Entretien le",   col: "vuEntretienLe"        },
+    { label: "Impression",     col: "impressionGlobale"    },
+    { label: "Orientation",    col: "orientationCandidat"  },
+    { label: "Site cible",     col: null                   },
+    { label: "",               col: null                   },
   ];
 
   return (
@@ -187,52 +183,69 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
         />
       )}
 
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold text-gray-900">Candidats</h1>
+      {/* ── En-tête ── */}
+      <div className="flex items-center justify-between mb-5">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Candidats</h1>
+          <p className="text-sm text-gray-400 mt-0.5">{allCandidats.length} candidat{allCandidats.length !== 1 ? "s" : ""} au total</p>
+        </div>
         <button onClick={onNew}
           className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-5 py-2.5 rounded-xl font-medium">
           + Nouveau candidat
         </button>
       </div>
 
-      {/* ── Onglets par statut ── */}
-      <div className="flex gap-1.5 mb-4 flex-wrap">
+      {/* ── Onglets de navigation par statut ── */}
+      <div className="flex gap-2 mb-4 flex-wrap">
         {STATUS_TABS.map(t => {
           const count  = countByStatus[t.key] ?? 0;
           const active = filterStatus === t.key;
           return (
             <button
-              key={String(t.key)}
+              key={t.key}
               onClick={() => { setFilterStatus(t.key); setSelected(new Set()); }}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-medium border transition-all ${
+              style={active ? { backgroundColor: t.bg, color: t.hex, borderColor: t.hex + "60" } : {}}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border transition-all ${
                 active
-                  ? `${t.activeBg} ${t.color} border-current/30 shadow-sm`
+                  ? "shadow-sm"
                   : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
               }`}
             >
               {t.label}
-              {count > 0 && (
-                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${active ? "bg-white/60" : "bg-gray-100 text-gray-500"}`}>
-                  {count}
-                </span>
-              )}
+              <span
+                style={active ? { backgroundColor: t.hex + "25", color: t.hex } : {}}
+                className={`text-xs px-1.5 py-0.5 rounded-full font-bold min-w-[20px] text-center ${
+                  active ? "" : "bg-gray-100 text-gray-500"
+                }`}>
+                {count}
+              </span>
             </button>
           );
         })}
       </div>
 
+      {/* ── Tableau ── */}
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        {/* ── Barre recherche ── */}
-        <div className="p-4 border-b border-gray-100">
+
+        {/* Barre recherche */}
+        <div className="p-4 border-b border-gray-100 flex items-center gap-3">
           <input
             className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
             placeholder="Rechercher un candidat…"
             value={search}
-            onChange={e => { setSearch(e.target.value); setSelected(new Set()); setFilterStatus(null); }}
+            onChange={e => { setSearch(e.target.value); setSelected(new Set()); }}
           />
+          {filterStatus !== "all" && (
+            <button
+              onClick={() => setFilterStatus("all")}
+              style={{ color: STATUS_TABS.find(t => t.key === filterStatus)?.hex }}
+              className="text-xs font-medium px-3 py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 flex items-center gap-1">
+              ✕ {STATUS_TABS.find(t => t.key === filterStatus)?.label}
+            </button>
+          )}
         </div>
 
-        {/* ── Barre sélection admin ── */}
+        {/* Barre sélection admin */}
         {isAdmin && someSelected && (
           <div className="px-4 py-2.5 bg-red-50 border-b border-red-100 flex items-center justify-between">
             <p className="text-sm font-medium text-red-700">
@@ -265,8 +278,7 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
               {cols.map(({ label, col }) => (
                 <th key={label}
                   onClick={() => col && toggleSort(col)}
-                  className={`text-left p-3 text-xs font-semibold uppercase select-none ${col ? "text-gray-500 cursor-pointer hover:text-purple-600" : "text-gray-400"}`}
-                >
+                  className={`text-left p-3 text-xs font-semibold uppercase tracking-wide select-none ${col ? "text-gray-500 cursor-pointer hover:text-purple-600" : "text-gray-400"}`}>
                   {label}{col ? sortIcon(col) : ""}
                 </th>
               ))}
@@ -281,15 +293,19 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
                   onClick={() => {
                     if (isAdmin && someSelected) { toggleOne(s.id); return; }
                     setSelectedSalarie(s); setPage("fiche");
-                  }}
-                >
+                  }}>
                   {isAdmin && (
                     <td className="p-3" onClick={e => { e.stopPropagation(); toggleOne(s.id); }}>
                       <input type="checkbox" checked={sel} onChange={() => toggleOne(s.id)}
                         className="w-4 h-4 rounded accent-purple-600 cursor-pointer" />
                     </td>
                   )}
-                  <td className="p-3 font-semibold text-gray-900">{s.nom} {s.prenom}</td>
+                  <td className="p-3">
+                    <p className="font-semibold text-gray-900">{s.nom} {s.prenom}</p>
+                    {s.interimPropose && (
+                      <span className="text-xs text-purple-600 font-medium">ID'EES Intérim proposé</span>
+                    )}
+                  </td>
                   <td className="p-3 text-gray-500 text-xs">{fmt(s.candidatureRecueLe) || "—"}</td>
                   <td className="p-3 text-gray-500 text-xs">{fmt(s.appelerLe) || "—"}</td>
                   <td className="p-3 text-gray-500 text-xs">{fmt(s.vuEntretienLe) || "—"}</td>
@@ -297,13 +313,12 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
                   <td className="p-3"><Badge map={ORI_STYLE} labelMap={ORI_LABEL} value={s.orientationCandidat} /></td>
                   <td className="p-3 text-gray-400 text-xs">{s.orientationSiteId ? siteName(s.orientationSiteId) : "—"}</td>
                   <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
-                    {!sel && onConvertToSalarie && (
+                    {!sel && onConvertToSalarie && s.orientationCandidat !== "decliner" && (
                       <button
                         onClick={() => onConvertToSalarie(s)}
-                        className="text-xs text-indigo-600 hover:bg-indigo-50 px-3 py-1 rounded-lg border border-indigo-200 whitespace-nowrap font-medium"
-                        title="Convertir ce candidat en salarié"
-                      >
-                        → Salarié
+                        className="text-xs text-green-700 hover:bg-green-50 px-3 py-1 rounded-lg border border-green-200 whitespace-nowrap font-medium"
+                        title="Embaucher ce candidat">
+                        ✓ Embaucher
                       </button>
                     )}
                   </td>
@@ -312,8 +327,12 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
             })}
             {candidats.length === 0 && (
               <tr>
-                <td colSpan={isAdmin ? 9 : 8} className="p-8 text-center text-gray-300">
-                  Aucun candidat
+                <td colSpan={isAdmin ? 9 : 8} className="p-10 text-center">
+                  <p className="text-gray-300 text-sm">
+                    {filterStatus !== "all"
+                      ? `Aucun candidat en statut "${STATUS_TABS.find(t => t.key === filterStatus)?.label}"`
+                      : "Aucun candidat"}
+                  </p>
                 </td>
               </tr>
             )}
@@ -321,9 +340,14 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
         </table>
 
         {candidats.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
-            {candidats.length} candidat{candidats.length > 1 ? "s" : ""}
-            {isAdmin && selectedCount > 0 && ` · ${selectedCount} sélectionné${selectedCount > 1 ? "s" : ""}`}
+          <div className="px-4 py-2.5 border-t border-gray-100 flex items-center justify-between text-xs text-gray-400">
+            <span>
+              {candidats.length} candidat{candidats.length > 1 ? "s" : ""}
+              {filterStatus !== "all" && ` · filtre : ${STATUS_TABS.find(t => t.key === filterStatus)?.label}`}
+            </span>
+            {isAdmin && selectedCount > 0 && (
+              <span>{selectedCount} sélectionné{selectedCount > 1 ? "s" : ""}</span>
+            )}
           </div>
         )}
       </div>
