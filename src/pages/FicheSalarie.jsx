@@ -5,6 +5,7 @@ import { fC } from "../lib/theme";
 import { Card, Row } from "../components/ui";
 import EntretienForm from "../components/EntretienForm";
 import FormulaireEntretienCandidat from "../components/FormulaireEntretienCandidat";
+import FormulaireDeclinerCandidat from "../components/FormulaireDeclinerCandidat";
 
 // ─── Définition des champs suivis pour la complétude ─────────────────────────
 const CHAMPS = [
@@ -105,10 +106,11 @@ function CompletionBar({ salarie, onEdit }) {
   );
 }
 
-export default function FicheSalarie({ salarie, entretiens, user, users, sites = [], setPage, onEdit, onAddEntretien, onOpenSortie, onDelete, onSaveCandidat }) {
-  const [tab,      setTab]      = useState("apercu");
-  const [showE,    setShowE]    = useState(false);
-  const [showCandE, setShowCandE] = useState(false);
+export default function FicheSalarie({ salarie, entretiens, user, users, sites = [], setPage, onEdit, onAddEntretien, onOpenSortie, onDelete, onSaveCandidat, onConvertToSalarie }) {
+  const [tab,         setTab]         = useState("apercu");
+  const [showE,       setShowE]       = useState(false);
+  const [showCandE,   setShowCandE]   = useState(false);
+  const [showDecliner, setShowDecliner] = useState(false);
 
   const mesE    = entretiens.filter(e => e.salarie_id === salarie.id).sort((a, b) => new Date(b.date) - new Date(a.date));
   const tousObj = mesE.flatMap(e => e.objectifs || []).filter(o => o.intitule);
@@ -144,6 +146,21 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
           onClose={() => setShowCandE(false)}
         />
       )}
+      {showDecliner && salarie.isCandidat && (
+        <FormulaireDeclinerCandidat
+          salarie={salarie}
+          entretiens={entretiens}
+          onDecliner={async ({ evaluationFinale, interimPropose }) => {
+            if (onSaveCandidat) await onSaveCandidat({
+              orientationCandidat: "decliner",
+              orientationMotif:    evaluationFinale,
+              interimPropose,
+            });
+            setShowDecliner(false);
+          }}
+          onClose={() => setShowDecliner(false)}
+        />
+      )}
 
       {/* ── Zone sticky : bouton retour + en-tête + onglets ────────────────── */}
       <div className="sticky top-0 z-20 bg-gray-50 px-6 pt-5 pb-3 border-b border-gray-100 shadow-sm">
@@ -177,7 +194,25 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
               className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl">
               + Entretien
             </button>
-            {!salarie.dateSortie && <button onClick={() => onOpenSortie(salarie)} className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl">Sortir</button>}
+            {salarie.isCandidat && !salarie.dateSortie && onConvertToSalarie && (
+              <button
+                onClick={() => onConvertToSalarie(salarie)}
+                className="text-sm bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-xl font-medium"
+                title="Convertir ce candidat en salarié">
+                ✓ Embaucher
+              </button>
+            )}
+            {salarie.isCandidat && !salarie.dateSortie && (
+              <button
+                onClick={() => setShowDecliner(true)}
+                className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl"
+                title="Décliner la candidature">
+                ✗ Décliner
+              </button>
+            )}
+            {!salarie.isCandidat && !salarie.dateSortie && (
+              <button onClick={() => onOpenSortie(salarie)} className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl">Sortir</button>
+            )}
             {user.role === "admin" && (
               <button
                 onClick={() => {

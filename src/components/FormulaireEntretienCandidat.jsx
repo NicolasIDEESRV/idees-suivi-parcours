@@ -14,7 +14,6 @@ const ORIENTATIONS = [
   { v: "evaluation", l: "Évaluation en cours", bg: "bg-orange-100 text-orange-800 border-orange-300", dot: "bg-orange-400" },
   { v: "recrute",    l: "Recruter",             bg: "bg-green-100 text-green-800 border-green-300",   dot: "bg-green-500"  },
   { v: "vivier",     l: "Vivier",               bg: "bg-blue-100  text-blue-800  border-blue-300",    dot: "bg-blue-500"   },
-  { v: "interim",    l: "Intérim ?",            bg: "bg-purple-100 text-purple-800 border-purple-300", dot: "bg-purple-500" },
   { v: "decliner",   l: "Décliner",             bg: "bg-red-100   text-red-800   border-red-300",     dot: "bg-red-500"    },
 ];
 

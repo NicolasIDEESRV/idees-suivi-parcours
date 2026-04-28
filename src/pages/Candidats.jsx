@@ -18,16 +18,27 @@ const ORI_STYLE = {
   evaluation: "bg-orange-100 text-orange-800 border-orange-200",
   recrute:    "bg-green-100  text-green-800  border-green-200",
   vivier:     "bg-blue-100   text-blue-800   border-blue-200",
-  interim:    "bg-purple-100 text-purple-800 border-purple-200",
   decliner:   "bg-red-100    text-red-800    border-red-200",
+  // legacy
+  interim:    "bg-purple-100 text-purple-800 border-purple-200",
 };
 const ORI_LABEL = {
   evaluation: "Évaluation",
   recrute:    "Recruté",
   vivier:     "Vivier",
-  interim:    "Intérim ?",
-  decliner:   "Décliner",
+  decliner:   "Décliné",
+  // legacy
+  interim:    "Intérim (ancien)",
 };
+
+// ─── Onglets statut candidat ──────────────────────────────────────────────────
+const STATUS_TABS = [
+  { key: null,         label: "Tous",                color: "text-gray-600",   activeBg: "bg-gray-100"    },
+  { key: "evaluation", label: "Évaluation",          color: "text-orange-700", activeBg: "bg-orange-100"  },
+  { key: "vivier",     label: "Vivier",              color: "text-blue-700",   activeBg: "bg-blue-100"    },
+  { key: "recrute",    label: "Recruté",             color: "text-green-700",  activeBg: "bg-green-100"   },
+  { key: "decliner",   label: "Décliné",             color: "text-red-700",    activeBg: "bg-red-100"     },
+];
 
 function Badge({ map, labelMap, value }) {
   if (!value) return <span className="text-gray-300 text-xs">—</span>;
@@ -69,12 +80,13 @@ function ConfirmDeleteModal({ count, onConfirm, onCancel, loading }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 export default function Candidats({ user, salaries, sites = [], setPage, setSelectedSalarie, onNew, onDeleteMany, onConvertToSalarie }) {
-  const [search,     setSearch]     = useState("");
-  const [sortCol,    setSortCol]    = useState("candidatureRecueLe");
-  const [sortDir,    setSortDir]    = useState(-1); // plus récents en premier
-  const [selected,   setSelected]   = useState(new Set());
-  const [confirmDel, setConfirmDel] = useState(false);
-  const [deleting,   setDeleting]   = useState(false);
+  const [search,       setSearch]       = useState("");
+  const [sortCol,      setSortCol]      = useState("candidatureRecueLe");
+  const [sortDir,      setSortDir]      = useState(-1); // plus récents en premier
+  const [selected,     setSelected]     = useState(new Set());
+  const [confirmDel,   setConfirmDel]   = useState(false);
+  const [deleting,     setDeleting]     = useState(false);
+  const [filterStatus, setFilterStatus] = useState(null);
 
   const isAdmin = user.role === "admin";
 
@@ -83,8 +95,27 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
   const candidats = salaries.filter(s => {
     if (!s.isCandidat) return false;
     if (scopeIds !== null && !scopeIds.includes(s.site_id)) return false;
+    if (filterStatus !== null && s.orientationCandidat !== filterStatus) return false;
     return `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase());
   });
+
+  // Comptages par statut pour les badges d'onglets
+  const countByStatus = STATUS_TABS.reduce((acc, t) => {
+    if (t.key === null) {
+      acc[null] = salaries.filter(s => {
+        if (!s.isCandidat) return false;
+        if (scopeIds !== null && !scopeIds.includes(s.site_id)) return false;
+        return true;
+      }).length;
+    } else {
+      acc[t.key] = salaries.filter(s => {
+        if (!s.isCandidat) return false;
+        if (scopeIds !== null && !scopeIds.includes(s.site_id)) return false;
+        return s.orientationCandidat === t.key;
+      }).length;
+    }
+    return acc;
+  }, {});
 
   const sorted = [...candidats].sort((a, b) => {
     let va = a[sortCol] ?? "";
@@ -156,12 +187,38 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
         />
       )}
 
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-gray-900">Candidats</h1>
         <button onClick={onNew}
           className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-5 py-2.5 rounded-xl font-medium">
           + Nouveau candidat
         </button>
+      </div>
+
+      {/* ── Onglets par statut ── */}
+      <div className="flex gap-1.5 mb-4 flex-wrap">
+        {STATUS_TABS.map(t => {
+          const count  = countByStatus[t.key] ?? 0;
+          const active = filterStatus === t.key;
+          return (
+            <button
+              key={String(t.key)}
+              onClick={() => { setFilterStatus(t.key); setSelected(new Set()); }}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-sm font-medium border transition-all ${
+                active
+                  ? `${t.activeBg} ${t.color} border-current/30 shadow-sm`
+                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+              }`}
+            >
+              {t.label}
+              {count > 0 && (
+                <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${active ? "bg-white/60" : "bg-gray-100 text-gray-500"}`}>
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
@@ -171,7 +228,7 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
             className="w-full max-w-sm border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-200"
             placeholder="Rechercher un candidat…"
             value={search}
-            onChange={e => { setSearch(e.target.value); setSelected(new Set()); }}
+            onChange={e => { setSearch(e.target.value); setSelected(new Set()); setFilterStatus(null); }}
           />
         </div>
 

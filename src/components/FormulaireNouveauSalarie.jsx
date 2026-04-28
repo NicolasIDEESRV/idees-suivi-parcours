@@ -97,7 +97,7 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
   const okCandidat = okBase && !!(form.candidatureRecueLe) && form.activitesPrio.length > 0 &&
     (!form.vuEntretienLe || (
       form.impressionGlobale && form.orientationCandidat &&
-      (form.orientationCandidat === "evaluation" || form.orientationCandidat === "decliner" || form.orientationSiteId)
+      (form.orientationCandidat === "evaluation" || form.orientationCandidat === "decliner" || form.orientationCandidat === "vivier" || form.orientationSiteId)
     ));
   const okSal = okBase && !!(form.dateEntree && form.dateFinContrat && form.dateFinAgrement && form.site_id);
   const ok = form.isCandidat ? okCandidat : okSal;
@@ -408,11 +408,10 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                 </p>
                 <div className="space-y-2">
                   {[
-                    { val: "evaluation", label: "Évaluation en cours", sub: "Entretien(s) en cours — décision à venir",       color: "border-orange-300"  },
-                    { val: "recrute",    label: "Recruté",              sub: "Intégration en CDDI ID'EES",                    color: "border-green-300"   },
-                    { val: "vivier",     label: "Vivier",               sub: "Profil à rappeler lors d'une prochaine ouverture", color: "border-blue-300" },
-                    { val: "interim",    label: "Intérim ?",            sub: "À explorer via ID'EES Intérim",                 color: "border-purple-300"  },
-                    { val: "decliner",   label: "Décliner",             sub: "Motif à préciser ci-dessous",                   color: "border-red-300"     },
+                    { val: "evaluation", label: "Évaluation en cours", sub: "Entretien(s) en cours — décision à venir",          color: "border-orange-300" },
+                    { val: "recrute",    label: "Recruté",              sub: "Intégration en CDDI ID'EES",                        color: "border-green-300"  },
+                    { val: "vivier",     label: "Vivier",               sub: "Profil à rappeler lors d'une prochaine ouverture",   color: "border-blue-300"   },
+                    { val: "decliner",   label: "Décliner",             sub: "Motif à préciser ci-dessous",                       color: "border-red-300"    },
                   ].map(opt => (
                     <label key={opt.val} className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${form.orientationCandidat === opt.val ? opt.color + " bg-gray-50" : "border-gray-200 hover:" + opt.color}`}>
                       <input type="radio" name="orientation" value={opt.val}

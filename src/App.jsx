@@ -212,6 +212,7 @@ function AppInner({ user, onLogout }) {
           onEdit={s => setEditSal(s)}
           onAddEntretien={onSaveEntretien}
           onOpenSortie={setSortSal}
+          onConvertToSalarie={setConvertCand}
           onSaveCandidat={async (updates) => {
             const { salarie: updated } = await handleSaveSal({ ...sel, ...updates });
             setSel(updated);
