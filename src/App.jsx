@@ -207,14 +207,18 @@ function AppInner({ user, onLogout }) {
       )}
       {page === "fiche" && sel && (
         <FicheSalarie
-          salarie={sel} entretiens={entretiens} user={user} users={profiles}
+          salarie={sel} entretiens={entretiens} user={user} users={profiles} sites={sites}
           setPage={navigate}
           onEdit={s => setEditSal(s)}
           onAddEntretien={onSaveEntretien}
           onOpenSortie={setSortSal}
+          onSaveCandidat={async (updates) => {
+            const { salarie: updated } = await handleSaveSal({ ...sel, ...updates });
+            setSel(updated);
+          }}
           onDelete={async (id) => {
             await handleDeleteSalarie(id);
-            navigate("salaries");
+            navigate(sel?.isCandidat ? "candidats" : "salaries");
           }}
         />
       )}

@@ -4,6 +4,7 @@ import { fmt, getAge, dureeM, daysUntil, urgC } from "../lib/utils";
 import { fC } from "../lib/theme";
 import { Card, Row } from "../components/ui";
 import EntretienForm from "../components/EntretienForm";
+import FormulaireEntretienCandidat from "../components/FormulaireEntretienCandidat";
 
 // ─── Définition des champs suivis pour la complétude ─────────────────────────
 const CHAMPS = [
@@ -104,9 +105,10 @@ function CompletionBar({ salarie, onEdit }) {
   );
 }
 
-export default function FicheSalarie({ salarie, entretiens, user, users, setPage, onEdit, onAddEntretien, onOpenSortie, onDelete }) {
-  const [tab,   setTab]   = useState("apercu");
-  const [showE, setShowE] = useState(false);
+export default function FicheSalarie({ salarie, entretiens, user, users, sites = [], setPage, onEdit, onAddEntretien, onOpenSortie, onDelete, onSaveCandidat }) {
+  const [tab,      setTab]      = useState("apercu");
+  const [showE,    setShowE]    = useState(false);
+  const [showCandE, setShowCandE] = useState(false);
 
   const mesE    = entretiens.filter(e => e.salarie_id === salarie.id).sort((a, b) => new Date(b.date) - new Date(a.date));
   const tousObj = mesE.flatMap(e => e.objectifs || []).filter(o => o.intitule);
@@ -132,10 +134,20 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
           onClose={() => setShowE(false)}
         />
       )}
+      {showCandE && salarie.isCandidat && (
+        <FormulaireEntretienCandidat
+          salarie={salarie}
+          sites={sites}
+          users={users}
+          onSaveEntretien={async (e) => { await onAddEntretien(e); }}
+          onSaveCandidat={async (updates) => { if (onSaveCandidat) await onSaveCandidat(updates); }}
+          onClose={() => setShowCandE(false)}
+        />
+      )}
 
       {/* ── Zone sticky : bouton retour + en-tête + onglets ────────────────── */}
       <div className="sticky top-0 z-20 bg-gray-50 px-6 pt-5 pb-3 border-b border-gray-100 shadow-sm">
-        <button onClick={() => setPage("salaries")} className="text-sm text-gray-400 hover:text-indigo-600 mb-3 block">← Retour</button>
+        <button onClick={() => setPage(salarie.isCandidat ? "candidats" : "salaries")} className="text-sm text-gray-400 hover:text-indigo-600 mb-3 block">← Retour</button>
 
         {/* En-tête salarié */}
         <div className="bg-white rounded-2xl border border-gray-200 p-4 mb-3">
@@ -160,7 +172,11 @@ export default function FicheSalarie({ salarie, entretiens, user, users, setPage
           </div>
           <div className="flex gap-2 shrink-0 flex-wrap">
             <button onClick={() => onEdit(salarie)} className="text-sm text-indigo-600 border border-indigo-200 hover:bg-indigo-50 px-3 py-2 rounded-xl">✏ Modifier</button>
-            <button onClick={() => setShowE(true)}  className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl">+ Entretien</button>
+            <button
+              onClick={() => salarie.isCandidat ? setShowCandE(true) : setShowE(true)}
+              className="text-sm bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-xl">
+              + Entretien
+            </button>
             {!salarie.dateSortie && <button onClick={() => onOpenSortie(salarie)} className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl">Sortir</button>}
             {user.role === "admin" && (
               <button

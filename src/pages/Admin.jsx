@@ -616,6 +616,7 @@ function HeuresMensuelles({ sites }) {
   const [fFiliale,  setFFiliale]  = useState("");
   const [fSecteur,  setFSecteur]  = useState("");
   const [fActivite, setFActivite] = useState("");
+  const [fSite,     setFSite]     = useState("");
 
   const allActive = sites.filter(s => s.actif !== false);
 
@@ -630,11 +631,20 @@ function HeuresMensuelles({ sites }) {
              .map(s => s.activite).filter(Boolean)
   )];
 
+  const sitesList = [...new Set(
+    allActive.filter(s =>
+      (!fFiliale  || s.filiale  === fFiliale)  &&
+      (!fSecteur  || s.secteur  === fSecteur)  &&
+      (!fActivite || s.activite === fActivite)
+    ).map(s => s.nom).filter(Boolean)
+  )];
+
   // Sites filtrés pour le tableau
   const activeSites = allActive.filter(s =>
     (!fFiliale  || s.filiale  === fFiliale)  &&
     (!fSecteur  || s.secteur  === fSecteur)  &&
-    (!fActivite || s.activite === fActivite)
+    (!fActivite || s.activite === fActivite) &&
+    (!fSite     || s.nom      === fSite)
   );
 
   const load = useCallback(async () => {
@@ -781,9 +791,22 @@ function HeuresMensuelles({ sites }) {
                 </select>
               </div>
             )}
-            {(fFiliale || fSecteur || fActivite) && (
+            {sitesList.length > 1 && (
+              <div>
+                <label className="text-xs text-gray-400 font-medium block mb-1">Site</label>
+                <select
+                  value={fSite}
+                  onChange={e => setFSite(e.target.value)}
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
+                >
+                  <option value="">Tous</option>
+                  {sitesList.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+            )}
+            {(fFiliale || fSecteur || fActivite || fSite) && (
               <button
-                onClick={() => { setFFiliale(""); setFSecteur(""); setFActivite(""); }}
+                onClick={() => { setFFiliale(""); setFSecteur(""); setFActivite(""); setFSite(""); }}
                 className="text-xs text-gray-400 hover:text-red-500 px-2 py-1.5 rounded-lg hover:bg-red-50 border border-transparent hover:border-red-100"
               >
                 ✕ Effacer les filtres
