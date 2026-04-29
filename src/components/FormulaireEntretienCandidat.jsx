@@ -43,23 +43,32 @@ function RadioChips({ options, value, onChange }) {
   );
 }
 
-// ─── Sélecteur de site ────────────────────────────────────────────────────────
-function SiteSelector({ sites, value, onChange }) {
+// ─── Sélecteur de sites multiples ────────────────────────────────────────────
+function SiteMultiSelector({ sites, value = [], onChange }) {
   const filialesList = [...new Set(sites.map(s => s.filiale).filter(Boolean))];
   const [openFil, setOpenFil] = useState(null);
+
+  const toggle = (siteId) => {
+    onChange(value.includes(siteId) ? value.filter(id => id !== siteId) : [...value, siteId]);
+  };
+
   return (
     <div className="space-y-2">
       {filialesList.map(fil => {
         const filSites = sites.filter(s => s.filiale === fil);
         const isOpen   = openFil === fil;
-        const selSite  = filSites.find(s => s.id === value);
+        const selCount = filSites.filter(s => value.includes(s.id)).length;
         return (
           <div key={fil} className="border border-gray-200 rounded-xl overflow-hidden">
             <button type="button" onClick={() => setOpenFil(isOpen ? null : fil)}
               className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 text-xs font-semibold text-gray-700">
               {fil}
               <span className="flex items-center gap-2">
-                {selSite && <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">{selSite.nom}</span>}
+                {selCount > 0 && (
+                  <span className="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
+                    {selCount} sélectionné{selCount > 1 ? "s" : ""}
+                  </span>
+                )}
                 <span className="text-gray-400">{isOpen ? "▲" : "▼"}</span>
               </span>
             </button>
@@ -67,10 +76,9 @@ function SiteSelector({ sites, value, onChange }) {
               <div className="p-2 space-y-1">
                 {filSites.map(s => (
                   <label key={s.id} className="flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg hover:bg-gray-50">
-                    <input type="radio" name="orientationSite" value={s.id}
-                      checked={value === s.id}
-                      onChange={() => { onChange(s.id); setOpenFil(null); }}
-                      className="accent-indigo-600" />
+                    <input type="checkbox" checked={value.includes(s.id)}
+                      onChange={() => toggle(s.id)}
+                      className="rounded accent-indigo-600" />
                     <span className="text-xs text-gray-700">{s.nom}{s.ville ? ` — ${s.ville}` : ""}</span>
                   </label>
                 ))}
@@ -79,8 +87,19 @@ function SiteSelector({ sites, value, onChange }) {
           </div>
         );
       })}
-      {value && (
-        <button type="button" onClick={() => onChange(null)} className="text-xs text-red-400 hover:text-red-600">✕ Effacer</button>
+      {value.length > 0 && (
+        <div className="flex flex-wrap gap-1 pt-1">
+          {value.map(id => {
+            const s = sites.find(x => x.id === id);
+            if (!s) return null;
+            return (
+              <span key={id} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-0.5 rounded-full border border-indigo-200">
+                {[s.filiale, s.nom].filter(Boolean).join(" › ")}
+                <button type="button" onClick={() => toggle(id)} className="text-indigo-400 hover:text-red-500 ml-0.5">×</button>
+              </span>
+            );
+          })}
+        </div>
       )}
     </div>
   );
@@ -181,7 +200,7 @@ export default function FormulaireEntretienCandidat({
     impression:         salarie.impressionGlobale    || "",
     orientation:        salarie.orientationCandidat  || "",
     orientationMotif:   salarie.orientationMotif     || "",
-    orientationSiteId:  salarie.orientationSiteId    ?? null,
+    orientationSiteIds: salarie.orientationSiteIds   ?? [],
     commentaireFinal:   "",
   });
 
@@ -247,7 +266,7 @@ export default function FormulaireEntretienCandidat({
         impressionDetail:   form.commentaireFinal || salarie.impressionDetail,
         orientationCandidat: form.orientation || salarie.orientationCandidat,
         orientationMotif:   form.orientationMotif || salarie.orientationMotif,
-        orientationSiteId:  form.orientationSiteId ?? salarie.orientationSiteId,
+        orientationSiteIds: form.orientationSiteIds.length > 0 ? form.orientationSiteIds : (salarie.orientationSiteIds ?? []),
       };
       await onSaveCandidat(updates);
       onClose();
@@ -617,9 +636,10 @@ export default function FormulaireEntretienCandidat({
               {(form.orientation === "recrute" || form.orientation === "vivier") && sites.length > 0 && (
                 <div>
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-                    Filiale / Secteur / Activité / Site pressenti
+                    Filiale / Activité(s) pressenties
+                    <span className="text-gray-400 font-normal normal-case ml-1">— plusieurs choix possibles</span>
                   </label>
-                  <SiteSelector sites={sites} value={form.orientationSiteId} onChange={v => upd("orientationSiteId", v)} />
+                  <SiteMultiSelector sites={sites} value={form.orientationSiteIds} onChange={v => upd("orientationSiteIds", v)} />
                 </div>
               )}
 

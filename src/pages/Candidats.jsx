@@ -156,9 +156,12 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
     }
   };
 
-  const siteName = (siteId) => {
-    const s = sites.find(x => x.id === siteId);
-    return s ? [s.filiale, s.nom].filter(Boolean).join(" › ") : "—";
+  const siteNames = (siteIds = []) => {
+    if (!siteIds?.length) return null;
+    return siteIds.map(id => {
+      const s = sites.find(x => x.id === id);
+      return s ? [s.filiale, s.nom].filter(Boolean).join(" › ") : null;
+    }).filter(Boolean);
   };
 
   const cols = [
@@ -168,7 +171,7 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
     { label: "Entretien le",   col: "vuEntretienLe"        },
     { label: "Impression",     col: "impressionGlobale"    },
     { label: "Orientation",    col: "orientationCandidat"  },
-    { label: "Site cible",     col: null                   },
+    { label: "Activité(s)",     col: null                   },
     { label: "",               col: null                   },
   ];
 
@@ -311,7 +314,19 @@ export default function Candidats({ user, salaries, sites = [], setPage, setSele
                   <td className="p-3 text-gray-500 text-xs">{fmt(s.vuEntretienLe) || "—"}</td>
                   <td className="p-3"><Badge map={IMP_STYLE} labelMap={IMP_LABEL} value={s.impressionGlobale} /></td>
                   <td className="p-3"><Badge map={ORI_STYLE} labelMap={ORI_LABEL} value={s.orientationCandidat} /></td>
-                  <td className="p-3 text-gray-400 text-xs">{s.orientationSiteId ? siteName(s.orientationSiteId) : "—"}</td>
+                  <td className="p-3">
+                    {(() => {
+                      const names = siteNames(s.orientationSiteIds);
+                      if (!names?.length) return <span className="text-gray-300 text-xs">—</span>;
+                      return (
+                        <div className="flex flex-wrap gap-1">
+                          {names.map((n, i) => (
+                            <span key={i} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100 whitespace-nowrap">{n}</span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </td>
                   <td className="p-3 text-right" onClick={e => e.stopPropagation()}>
                     {!sel && onConvertToSalarie && s.orientationCandidat !== "decliner" && (
                       <button

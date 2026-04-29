@@ -43,7 +43,7 @@ export const newSal = (o = {}) => ({
   isCandidat: false,
   candidatureRecueLe: "", appelerLe: "", vuEntretienLe: "",
   impressionGlobale: "", impressionDetail: "",
-  orientationCandidat: "", orientationMotif: "", orientationSiteId: null,
+  orientationCandidat: "", orientationMotif: "", orientationSiteIds: [],
   interimPropose: false,
   activitesPrio: [],
   // Entretien candidat — champs complémentaires

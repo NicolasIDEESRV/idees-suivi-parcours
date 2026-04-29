@@ -97,7 +97,7 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
   const okCandidat = okBase && !!(form.candidatureRecueLe) && form.activitesPrio.length > 0 &&
     (!form.vuEntretienLe || (
       form.impressionGlobale && form.orientationCandidat &&
-      (form.orientationCandidat === "evaluation" || form.orientationCandidat === "decliner" || form.orientationCandidat === "vivier" || form.orientationSiteId)
+      (form.orientationCandidat === "evaluation" || form.orientationCandidat === "decliner" || form.orientationCandidat === "vivier" || form.orientationSiteIds?.length > 0)
     ));
   const okSal = okBase && !!(form.dateEntree && form.dateFinContrat && form.dateFinAgrement && form.site_id);
   const ok = form.isCandidat ? okCandidat : okSal;
@@ -441,19 +441,17 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                 )}
               </div>
 
-              {/* Orientation SECTEUR — obligatoire si entretien renseigné */}
+              {/* Orientation SECTEUR — choix multiples */}
               <div>
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Orientation SECTEUR{form.vuEntretienLe ? " *" : ""}
+                  Filiale / Activité(s) pressenties{form.vuEntretienLe ? " *" : ""}
+                  <span className="text-gray-400 font-normal normal-case ml-1">— plusieurs choix possibles</span>
                 </p>
-                <FSelect label="Site / Activité cible" value={form.orientationSiteId || ""} onChange={e => upd("orientationSiteId", e.target.value || null)}>
-                  <option value="">— Sélectionner un site —</option>
-                  {sites.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
-                    </option>
-                  ))}
-                </FSelect>
+                <ActivitesPrioSelector
+                  sites={sites}
+                  value={form.orientationSiteIds ?? []}
+                  onChange={v => upd("orientationSiteIds", v)}
+                />
               </div>
             </div>
           )}
@@ -516,6 +514,21 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                         const s = sites.find(x => x.id === id);
                         return s ? (
                           <span key={id} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
+                            {[s.filiale, s.nom].filter(Boolean).join(" › ")}
+                          </span>
+                        ) : null;
+                      })}
+                    </div>
+                  </div>
+                )}
+                {(form.orientationSiteIds ?? []).length > 0 && (
+                  <div className="mt-2">
+                    <p className="text-xs text-gray-500 mb-1">Sites pressentis :</p>
+                    <div className="flex flex-wrap gap-1">
+                      {(form.orientationSiteIds ?? []).map(id => {
+                        const s = sites.find(x => x.id === id);
+                        return s ? (
+                          <span key={id} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
                             {[s.filiale, s.nom].filter(Boolean).join(" › ")}
                           </span>
                         ) : null;

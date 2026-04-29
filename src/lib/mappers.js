@@ -165,7 +165,8 @@ export const mapSalarieFromDB = (row) => ({
   impressionDetail:    row.impression_detail      ?? "",
   orientationCandidat: row.orientation_candidat   ?? "",
   orientationMotif:    row.orientation_motif      ?? "",
-  orientationSiteId:   row.orientation_site_id    ?? null,
+  // Multi-sites : priorité au nouveau champ, fallback sur l'ancien (rétrocompat)
+  orientationSiteIds:  row.orientation_site_ids   ?? (row.orientation_site_id ? [row.orientation_site_id] : []),
   activitesPrio:       row.activites_prio         ?? [],
   // Sécurité sociale
   numSecuSociale:      row.num_secu_sociale       ?? "",
@@ -285,7 +286,8 @@ export const mapSalarieToDB = (obj) => ({
   impression_detail:     obj.impressionDetail    || null,
   orientation_candidat:  obj.orientationCandidat || null,
   orientation_motif:     obj.orientationMotif    || null,
-  orientation_site_id:   obj.orientationSiteId   || null,
+  orientation_site_ids:  obj.orientationSiteIds  ?? [],
+  orientation_site_id:   obj.orientationSiteIds?.[0] ?? null,  // rétrocompat
   activites_prio:        obj.activitesPrio       ?? [],
   // Sécurité sociale
   num_secu_sociale:      obj.numSecuSociale      || null,
