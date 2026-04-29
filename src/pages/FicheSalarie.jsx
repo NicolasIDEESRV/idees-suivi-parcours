@@ -288,18 +288,20 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
             <p className="text-sm text-gray-400 mt-1">{salarie.preconisation}</p>
             <div className="flex gap-1 mt-2">{salarie.domainesPro?.filter(Boolean).map(d => <span key={d} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full">{d}</span>)}</div>
           </Card>
-          <Card title="Open Badges">
-            <div className="space-y-2">
-              {BADGES.map(b => (
-                <div key={b} className="flex items-center justify-between">
-                  <span className="text-sm text-gray-600">{b}</span>
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map(i => <div key={i} className={`w-3.5 h-3.5 rounded-full ${i <= (salarie.badges?.[b] || 0) ? "bg-indigo-500" : "bg-gray-100"}`} />)}
+          {!salarie.isCandidat && (
+            <Card title="Open Badges">
+              <div className="space-y-2">
+                {BADGES.map(b => (
+                  <div key={b} className="flex items-center justify-between">
+                    <span className="text-sm text-gray-600">{b}</span>
+                    <div className="flex gap-1">
+                      {[1, 2, 3, 4, 5].map(i => <div key={i} className={`w-3.5 h-3.5 rounded-full ${i <= (salarie.badges?.[b] || 0) ? "bg-indigo-500" : "bg-gray-100"}`} />)}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          </Card>
+                ))}
+              </div>
+            </Card>
+          )}
           <Card title="Mobilité & langue">
             <Row label="Permis B"  v={salarie.permisB ? "✓ Oui" : "✗ Non"} />
             <Row label="Véhicule"  v={salarie.vehicule ? "✓ Oui" : "✗ Non"} />

@@ -935,23 +935,30 @@ function HeuresMensuelles({ sites }) {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 export default function Admin({ user, sites }) {
-  const [tab, setTab] = useState("invite");
+  const isDirection = user.role === "direction";
+  const [tab, setTab] = useState(isDirection ? "heures" : "invite");
 
-  if (user.role !== "admin") {
+  if (user.role !== "admin" && user.role !== "direction") {
     return <div className="p-8 text-red-600 text-sm">Accès refusé.</div>;
   }
 
   const tabs = [
-    { id: "invite", label: "Inviter un utilisateur" },
-    { id: "users",  label: "Gestion des utilisateurs" },
+    ...(!isDirection ? [
+      { id: "invite", label: "Inviter un utilisateur" },
+      { id: "users",  label: "Gestion des utilisateurs" },
+    ] : []),
     { id: "heures", label: "Heures insertion (ETPI/ETPP)" },
   ];
 
   return (
     <div className="p-8 space-y-6 max-w-6xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">Administration</h1>
-        <p className="text-sm text-gray-400 mt-1">Gestion des accès et des utilisateurs.</p>
+        <h1 className="text-xl font-bold text-gray-900">
+          {isDirection ? "Heures insertion (ETPI / ETPP)" : "Administration"}
+        </h1>
+        <p className="text-sm text-gray-400 mt-1">
+          {isDirection ? "Suivi des heures par site, filiale et activité." : "Gestion des accès et des utilisateurs."}
+        </p>
       </div>
 
       {/* Onglets */}

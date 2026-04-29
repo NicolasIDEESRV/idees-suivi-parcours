@@ -1,7 +1,59 @@
 import { useState, useMemo } from "react";
 import { daysUntil, urgC, fmt, getScopeIds } from "../lib/utils";
 
-// ─── Filtres chips ────────────────────────────────────────────────────────────
+// ─── Pipeline candidats (sans Intérim) ───────────────────────────────────────
+const PIPELINE = [
+  { key: "evaluation", label: "Évaluation", hex: "#D97706", bg: "#FEF3C7", border: "#FCD34D" },
+  { key: "vivier",     label: "Vivier",     hex: "#2563EB", bg: "#DBEAFE", border: "#93C5FD" },
+  { key: "recrute",    label: "Recruté",    hex: "#059669", bg: "#D1FAE5", border: "#6EE7B7" },
+  { key: "decliner",   label: "Décliné",    hex: "#DC2626", bg: "#FEE2E2", border: "#FCA5A5" },
+];
+
+// ─── Périodes ─────────────────────────────────────────────────────────────────
+const PERIODS = [
+  { key: "all", label: "Tout"        },
+  { key: "1m",  label: "Ce mois"     },
+  { key: "3m",  label: "3 mois"      },
+  { key: "6m",  label: "6 mois"      },
+  { key: "12m", label: "12 mois"     },
+  { key: "ytd", label: "Année en cours" },
+];
+
+function isInPeriod(dateStr, period) {
+  if (!dateStr || period === "all") return true;
+  const d = new Date(dateStr);
+  const now = new Date();
+  if (period === "ytd") return d.getFullYear() === now.getFullYear();
+  if (period === "1m")  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
+  const months = parseInt(period);
+  const cutoff = new Date(now);
+  cutoff.setMonth(cutoff.getMonth() - months);
+  return d >= cutoff;
+}
+
+function periodLabel(period) {
+  return PERIODS.find(p => p.key === period)?.label ?? period;
+}
+
+// ─── Sélecteur de période ─────────────────────────────────────────────────────
+function PeriodSelector({ value, onChange }) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {PERIODS.map(p => (
+        <button key={p.key} onClick={() => onChange(p.key)}
+          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+            value === p.key
+              ? "bg-indigo-600 text-white border-indigo-600"
+              : "bg-white text-gray-500 border-gray-200 hover:border-indigo-300"
+          }`}>
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// ─── Filtres scope (filiale/secteur/activité/site) ───────────────────────────
 function CheckGroup({ label, options, selected, onChange }) {
   return (
     <div>
@@ -12,8 +64,7 @@ function CheckGroup({ label, options, selected, onChange }) {
           Tous
         </button>
         {options.map(o => (
-          <button key={o}
-            onClick={() => onChange(selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o])}
+          <button key={o} onClick={() => onChange(selected.includes(o) ? selected.filter(x => x !== o) : [...selected, o])}
             className={`px-2.5 py-1 rounded-lg border text-xs font-medium transition-colors ${selected.includes(o) ? "bg-indigo-600 text-white border-indigo-600" : "text-gray-600 border-gray-200 hover:border-indigo-300"}`}>
             {o}
           </button>
@@ -23,25 +74,39 @@ function CheckGroup({ label, options, selected, onChange }) {
   );
 }
 
-// ─── Badge dernier RDV ────────────────────────────────────────────────────────
-function rdvBadge(last) {
-  if (!last) return { cls: "bg-red-100 text-red-700 border-red-200",      label: "Jamais" };
-  const days = Math.floor((new Date() - new Date(last.date)) / 86_400_000);
-  if (days < 30) return { cls: "bg-green-100 text-green-700 border-green-200",   label: `−${days}j` };
-  if (days < 60) return { cls: "bg-orange-100 text-orange-700 border-orange-200", label: `+${days}j` };
-  return              { cls: "bg-red-100 text-red-700 border-red-200",            label: `+${days}j` };
+// ─── KPI card ─────────────────────────────────────────────────────────────────
+function KpiCard({ value, label, sub, pct, hex, onClick }) {
+  return (
+    <button onClick={onClick}
+      className="flex-1 min-w-0 flex flex-col items-center gap-1 p-3 rounded-xl border transition-all hover:shadow-sm cursor-pointer"
+      style={{ borderColor: hex + "40", backgroundColor: hex + "0D" }}>
+      <span className="text-3xl font-black leading-none" style={{ color: hex }}>{value}</span>
+      <span className="text-xs font-bold uppercase tracking-wide text-gray-600">{label}</span>
+      {pct !== undefined && (
+        <div className="w-full mt-1">
+          <div className="h-1 bg-gray-100 rounded-full overflow-hidden">
+            <div className="h-full rounded-full transition-all" style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: hex }} />
+          </div>
+          <p className="text-[10px] text-gray-400 text-center mt-0.5">{pct.toFixed(0)}%{sub ? ` · ${sub}` : ""}</p>
+        </div>
+      )}
+      {pct === undefined && sub && (
+        <p className="text-[10px] text-gray-400">{sub}</p>
+      )}
+    </button>
+  );
 }
 
-// ─── Pipeline candidats ───────────────────────────────────────────────────────
-const PIPELINE = [
-  { key: "evaluation", label: "Évaluation en cours", color: "#F59E0B", bg: "bg-amber-50",   border: "border-amber-200",  text: "text-amber-800",  dot: "bg-amber-400" },
-  { key: "vivier",     label: "Vivier",               color: "#3B82F6", bg: "bg-blue-50",    border: "border-blue-200",   text: "text-blue-800",   dot: "bg-blue-400"  },
-  { key: "recrute",    label: "Recruté",              color: "#059669", bg: "bg-emerald-50", border: "border-emerald-200",text: "text-emerald-800",dot: "bg-emerald-500"},
-  { key: "interim",    label: "Intérim ?",            color: "#8B5CF6", bg: "bg-purple-50",  border: "border-purple-200", text: "text-purple-800", dot: "bg-purple-400"},
-  { key: "decliner",   label: "Décliner",             color: "#EF4444", bg: "bg-red-50",     border: "border-red-200",    text: "text-red-800",    dot: "bg-red-400"   },
-];
+// ─── Badge dernier RDV ────────────────────────────────────────────────────────
+function rdvBadge(last) {
+  if (!last) return { cls: "bg-red-100 text-red-700 border-red-200", label: "Jamais" };
+  const days = Math.floor((new Date() - new Date(last.date)) / 86_400_000);
+  if (days < 30) return { cls: "bg-green-100 text-green-700 border-green-200", label: `−${days}j` };
+  if (days < 60) return { cls: "bg-orange-100 text-orange-700 border-orange-200", label: `+${days}j` };
+  return { cls: "bg-red-100 text-red-700 border-red-200", label: `+${days}j` };
+}
 
-// ─── Carte section ────────────────────────────────────────────────────────────
+// ─── Section card ─────────────────────────────────────────────────────────────
 function Section({ children, className = "" }) {
   return (
     <div className={`bg-white rounded-2xl border border-gray-200 overflow-hidden ${className}`}>
@@ -50,7 +115,7 @@ function Section({ children, className = "" }) {
   );
 }
 
-function SectionHeader({ icon, title, count, countLabel, color = "#4F46E5", action, onAction }) {
+function SectionHeader({ icon, title, count, color = "#4F46E5", action, onAction }) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
       <div className="flex items-center gap-2">
@@ -63,7 +128,6 @@ function SectionHeader({ icon, title, count, countLabel, color = "#4F46E5", acti
             {count}
           </span>
         )}
-        {countLabel && <span className="text-xs text-gray-400">{countLabel}</span>}
       </div>
       {action && (
         <button onClick={onAction} className="text-xs text-indigo-500 hover:text-indigo-700 font-medium">
@@ -74,15 +138,19 @@ function SectionHeader({ icon, title, count, countLabel, color = "#4F46E5", acti
   );
 }
 
-// ─── Dashboard ────────────────────────────────────────────────────────────────
+// ─── Dashboard principal ──────────────────────────────────────────────────────
 export default function Dashboard({ user, salaries, entretiens, sites = [], setPage, setSelectedSalarie }) {
   const todayStr = new Date().toISOString().slice(0, 10);
 
-  // ── Filtres ──────────────────────────────────────────────────────────────
+  // ── Filtres scope ────────────────────────────────────────────────────────
   const [selFiliale,  setSelFiliale]  = useState([]);
   const [selSecteur,  setSelSecteur]  = useState([]);
   const [selActivite, setSelActivite] = useState([]);
   const [selSite,     setSelSite]     = useState([]);
+
+  // ── Filtres période ──────────────────────────────────────────────────────
+  const [periodesSal,  setPeriodesSal]  = useState("all");
+  const [periodesCand, setPeriodesCand] = useState("all");
 
   const accessibleSites = useMemo(() => {
     if (user.role === "admin") return sites;
@@ -105,18 +173,22 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
     ).map(s => s.id);
   }, [accessibleSites, selFiliale, selSecteur, selActivite, selSite]);
 
-  // ── Population ──────────────────────────────────────────────────────────
+  // ── Population de base ───────────────────────────────────────────────────
   const scopeIds = getScopeIds(user, sites);
   const baseAll  = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
   const mine     = filteredSiteIds ? baseAll.filter(s => filteredSiteIds.includes(s.site_id)) : baseAll;
 
-  const actifs    = mine.filter(s => !s.isCandidat && !s.dateSortie);
-  const candidats = mine.filter(s =>  s.isCandidat);
+  // ── Salariés ─────────────────────────────────────────────────────────────
+  const salAll     = mine.filter(s => !s.isCandidat);
+  const actifs     = salAll.filter(s => !s.dateSortie);
+  const sortisAll  = salAll.filter(s => s.dateSortie);
+  const recrutesInPeriod = salAll.filter(s => isInPeriod(s.dateEntree, periodesSal));
+  const sortisInPeriod   = salAll.filter(s => s.dateSortie && isInPeriod(s.dateSortie, periodesSal));
+  const totalSal = salAll.length || 1; // éviter /0
 
   const finProches = actifs.filter(s => { const d = daysUntil(s.dateFinContrat); return d !== null && d <= 60 && d >= 0; });
 
   const myE = entretiens.filter(e => mine.some(s => s.id === e.salarie_id));
-
   const objDeadlines = myE
     .flatMap(e => (e.objectifs || []).map(o => ({ ...o, sal: mine.find(s => s.id === e.salarie_id) })))
     .filter(o => o.intitule && (o.atteint == null) && daysUntil(o.deadline) !== null && daysUntil(o.deadline) <= 14);
@@ -126,7 +198,6 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
     .filter(e => { const d = daysUntil(e.date); return d !== null && d >= 0 && d <= 30 && !e.synthese; })
     .sort((a, b) => new Date(a.date) - new Date(b.date));
 
-  // ── Dernier RDV ─────────────────────────────────────────────────────────
   const dernierRdv = useMemo(() => {
     return actifs.map(s => {
       const done = entretiens.filter(e => e.salarie_id === s.id && e.date <= todayStr)
@@ -140,15 +211,17 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
     });
   }, [actifs, entretiens, todayStr]);
 
-  // ── Pipeline candidats ───────────────────────────────────────────────────
-  const pipeline = useMemo(() => {
-    const sans = candidats.filter(c => !c.orientationCandidat).length;
-    const byOri = PIPELINE.map(p => ({
-      ...p,
-      count: candidats.filter(c => c.orientationCandidat === p.key).length,
-    })).filter(p => p.count > 0);
-    return { byOri, sans, total: candidats.length };
-  }, [candidats]);
+  // ── Candidats ────────────────────────────────────────────────────────────
+  const candidatsAll    = mine.filter(s => s.isCandidat);
+  const candidatsPeriod = candidatsAll.filter(s => isInPeriod(s.candidatureRecueLe, periodesCand));
+  const totalCand       = candidatsPeriod.length || 1;
+
+  const pipelineStats = PIPELINE.map(p => ({
+    ...p,
+    count: candidatsPeriod.filter(c => c.orientationCandidat === p.key).length,
+    pct:   Math.round(candidatsPeriod.filter(c => c.orientationCandidat === p.key).length / totalCand * 100),
+  }));
+  const sansAvis = candidatsPeriod.filter(c => !c.orientationCandidat).length;
 
   const showFilters = accessibleSites.length > 1;
 
@@ -163,7 +236,6 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
             {new Date().toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long", year: "numeric" })}
           </p>
         </div>
-        {/* Mini KPIs urgents */}
         <div className="flex gap-2 flex-wrap justify-end">
           {finProches.length > 0 && (
             <button onClick={() => setPage("preco")}
@@ -182,14 +254,14 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
         </div>
       </div>
 
-      {/* ── Filtres hiérarchiques ── */}
+      {/* ── Filtres scope ── */}
       {showFilters && (
         <div className="bg-white rounded-2xl border border-gray-200 p-4">
           <div className="flex flex-wrap gap-4">
             <CheckGroup label="Filiale"  options={filialesList}  selected={selFiliale}  onChange={v => { setSelFiliale(v);  setSelSecteur([]); setSelActivite([]); setSelSite([]); }} />
-            {secteursList.length  > 0 && <CheckGroup label="Secteur" options={secteursList}  selected={selSecteur}  onChange={v => { setSelSecteur(v);  setSelActivite([]); setSelSite([]); }} />}
+            {secteursList.length  > 0 && <CheckGroup label="Secteur"  options={secteursList}  selected={selSecteur}  onChange={v => { setSelSecteur(v);  setSelActivite([]); setSelSite([]); }} />}
             {activitesList.length > 0 && <CheckGroup label="Activité" options={activitesList} selected={selActivite} onChange={v => { setSelActivite(v); setSelSite([]); }} />}
-            {sitesList.length     > 1 && <CheckGroup label="Site"    options={sitesList}     selected={selSite}     onChange={setSelSite} />}
+            {sitesList.length     > 1 && <CheckGroup label="Site"     options={sitesList}     selected={selSite}     onChange={setSelSite} />}
           </div>
           {filteredSiteIds && (
             <p className="text-xs text-indigo-600 font-medium mt-2">
@@ -202,53 +274,61 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
       {/* ── Bloc principal : Salariés + Candidats ── */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
 
-        {/* ── SALARIÉS ── */}
+        {/* ═══ SALARIÉS ═══ */}
         <Section>
           <SectionHeader icon="👥" title="Salariés" color="#4F46E5"
             action="Voir la liste" onAction={() => setPage("salaries")} />
-          <div className="p-4">
-            {/* Gros chiffre */}
-            <div className="flex items-end gap-3 mb-4">
-              <div>
-                <p className="text-5xl font-black text-gray-900 leading-none">{actifs.length}</p>
-                <p className="text-sm text-gray-400 mt-1">salarié{actifs.length > 1 ? "s" : ""} actif{actifs.length > 1 ? "s" : ""}</p>
-              </div>
-              <div className="flex gap-2 mb-1.5 flex-wrap">
-                {finProches.length > 0 && (
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-red-100 text-red-700 border border-red-200 rounded-full">
-                    {finProches.length} fin{finProches.length > 1 ? "s" : ""} ≤60j ⚠
-                  </span>
-                )}
-                {nbRetard > 0 && (
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-orange-100 text-orange-700 border border-orange-200 rounded-full">
-                    {nbRetard} objectif{nbRetard > 1 ? "s" : ""} dépassé{nbRetard > 1 ? "s" : ""}
-                  </span>
-                )}
-                {prochains.length > 0 && (
-                  <span className="text-xs font-semibold px-2.5 py-1 bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-full">
-                    {prochains.length} entretien{prochains.length > 1 ? "s" : ""} à venir
-                  </span>
-                )}
-              </div>
+          <div className="p-4 space-y-4">
+
+            {/* Sélecteur période */}
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Période</p>
+              <PeriodSelector value={periodesSal} onChange={setPeriodesSal} />
             </div>
 
-            {/* Mini liste: derniers RDV à surveiller */}
+            {/* KPI cards */}
+            <div className="flex gap-2">
+              <KpiCard
+                value={actifs.length}
+                label="Actifs"
+                pct={Math.round(actifs.length / (salAll.length || 1) * 100)}
+                sub={`sur ${salAll.length} au total`}
+                hex="#4F46E5"
+                onClick={() => setPage("salaries")}
+              />
+              <KpiCard
+                value={recrutesInPeriod.length}
+                label="Recrutés"
+                pct={Math.round(recrutesInPeriod.length / (actifs.length || 1) * 100)}
+                sub={periodesSal !== "all" ? periodLabel(periodesSal) : "entrées total"}
+                hex="#059669"
+                onClick={() => setPage("salaries")}
+              />
+              <KpiCard
+                value={sortisInPeriod.length}
+                label="Sortis"
+                pct={Math.round(sortisInPeriod.length / (salAll.length || 1) * 100)}
+                sub={periodesSal !== "all" ? periodLabel(periodesSal) : `sur ${sortisAll.length} total`}
+                hex="#DC2626"
+                onClick={() => setPage("preco")}
+              />
+            </div>
+
+            {/* Mini liste suivi RDV */}
             {dernierRdv.length > 0 && (
               <div>
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">
                   Suivi RDV — priorité d'action
                 </p>
-                <div className="space-y-1 max-h-44 overflow-y-auto">
-                  {dernierRdv.slice(0, 6).map(({ sal, last }) => {
+                <div className="space-y-1 max-h-40 overflow-y-auto">
+                  {dernierRdv.slice(0, 5).map(({ sal, last }) => {
                     const badge = rdvBadge(last);
                     return (
                       <button key={sal.id}
                         onClick={() => { setSelectedSalarie(sal); setPage("fiche"); }}
-                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors group">
+                        className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
                         <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-indigo-700">
-                            {sal.nom[0]}{sal.prenom[0]}
-                          </span>
+                          <span className="text-[10px] font-bold text-indigo-700">{sal.nom[0]}{sal.prenom[0]}</span>
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-xs font-semibold text-gray-800 truncate">{sal.nom} {sal.prenom}</p>
@@ -268,87 +348,104 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
           </div>
         </Section>
 
-        {/* ── CANDIDATS ── */}
+        {/* ═══ CANDIDATS ═══ */}
         <Section>
           <SectionHeader icon="👤" title="Candidats"
-            count={pipeline.total}
-            countLabel={pipeline.total > 0 ? `dont ${candidats.filter(c => c.vuEntretienLe).length} vus en entretien` : ""}
+            count={candidatsPeriod.length}
             color="#8B5CF6"
             action="Voir la liste" onAction={() => setPage("candidats")} />
-          <div className="p-4">
-            {pipeline.total === 0 ? (
-              <div className="text-center py-8">
+          <div className="p-4 space-y-4">
+
+            {/* Sélecteur période */}
+            <div>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">
+                Période — candidatures reçues
+              </p>
+              <PeriodSelector value={periodesCand} onChange={setPeriodesCand} />
+            </div>
+
+            {candidatsPeriod.length === 0 ? (
+              <div className="text-center py-6">
                 <p className="text-3xl mb-2">👤</p>
-                <p className="text-sm text-gray-400">Aucun candidat en cours</p>
+                <p className="text-sm text-gray-400">
+                  {periodesCand !== "all" ? `Aucune candidature sur "${periodLabel(periodesCand)}"` : "Aucun candidat en cours"}
+                </p>
               </div>
             ) : (
               <div className="space-y-3">
-                {/* Pipeline visuel */}
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {PIPELINE.map(p => {
-                    const n = candidats.filter(c => c.orientationCandidat === p.key).length;
-                    return (
-                      <button key={p.key}
-                        onClick={() => setPage("candidats")}
-                        className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border transition-all hover:shadow-sm ${p.bg} ${p.border}`}>
-                        <div className="flex items-center gap-1.5">
-                          <span className={`w-2 h-2 rounded-full ${p.dot}`} />
-                          <span className={`text-xs font-semibold ${p.text}`}>{p.label}</span>
+                {/* Barres de pipeline avec % */}
+                <div className="space-y-2">
+                  {pipelineStats.map(p => (
+                    <button key={p.key}
+                      onClick={() => setPage("candidats")}
+                      className="w-full group">
+                      <div className="flex items-center gap-2 mb-0.5">
+                        <span className="text-xs font-semibold text-gray-700 w-28 text-left shrink-0">{p.label}</span>
+                        <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full rounded-full transition-all duration-500 flex items-center justify-end pr-2"
+                            style={{ width: `${Math.max(p.pct, p.count > 0 ? 8 : 0)}%`, backgroundColor: p.hex }}>
+                            {p.count > 0 && p.pct >= 15 && (
+                              <span className="text-[10px] font-bold text-white">{p.pct}%</span>
+                            )}
+                          </div>
                         </div>
-                        <span className={`text-2xl font-black ${p.text}`}>{n}</span>
-                      </button>
-                    );
-                  })}
-                  {/* Sans orientation */}
-                  {pipeline.sans > 0 && (
-                    <button onClick={() => setPage("candidats")}
-                      className="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-gray-200 bg-gray-50 hover:shadow-sm transition-all">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2 h-2 rounded-full bg-gray-300" />
-                        <span className="text-xs font-semibold text-gray-500">Sans avis</span>
+                        <div className="flex items-center gap-1.5 shrink-0 w-16 justify-end">
+                          <span className="text-sm font-black" style={{ color: p.hex }}>{p.count}</span>
+                          <span className="text-[10px] text-gray-400 font-medium">{p.pct}%</span>
+                        </div>
                       </div>
-                      <span className="text-2xl font-black text-gray-400">{pipeline.sans}</span>
                     </button>
+                  ))}
+
+                  {sansAvis > 0 && (
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-xs font-semibold text-gray-400 w-28 text-left shrink-0">Sans avis</span>
+                      <div className="flex-1 h-5 bg-gray-100 rounded-full overflow-hidden">
+                        <div className="h-full rounded-full bg-gray-300 transition-all duration-500"
+                          style={{ width: `${Math.max(Math.round(sansAvis / totalCand * 100), 8)}%` }} />
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0 w-16 justify-end">
+                        <span className="text-sm font-black text-gray-400">{sansAvis}</span>
+                        <span className="text-[10px] text-gray-400 font-medium">
+                          {Math.round(sansAvis / totalCand * 100)}%
+                        </span>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                {/* Mini liste candidats récents */}
-                {candidats.length > 0 && (
-                  <div>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Dernières candidatures</p>
-                    <div className="space-y-1 max-h-36 overflow-y-auto">
-                      {[...candidats]
-                        .sort((a, b) => (b.candidatureRecueLe || "").localeCompare(a.candidatureRecueLe || ""))
-                        .slice(0, 5)
-                        .map(c => (
+                {/* Dernières candidatures */}
+                <div>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Dernières candidatures</p>
+                  <div className="space-y-1 max-h-32 overflow-y-auto">
+                    {[...candidatsPeriod]
+                      .sort((a, b) => (b.candidatureRecueLe || "").localeCompare(a.candidatureRecueLe || ""))
+                      .slice(0, 4)
+                      .map(c => {
+                        const p = PIPELINE.find(x => x.key === c.orientationCandidat);
+                        return (
                           <button key={c.id}
                             onClick={() => { setSelectedSalarie(c); setPage("fiche"); }}
                             className="w-full text-left flex items-center gap-2 px-3 py-2 rounded-xl hover:bg-gray-50 transition-colors">
-                            <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
-                              <span className="text-[10px] font-bold text-purple-700">
-                                {c.nom[0]}{c.prenom[0]}
-                              </span>
+                            <div className="w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center shrink-0">
+                              <span className="text-[10px] font-bold text-purple-700">{c.nom[0]}{c.prenom[0]}</span>
                             </div>
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-semibold text-gray-800 truncate">{c.nom} {c.prenom}</p>
-                              <p className="text-[10px] text-gray-400">Candidature {fmt(c.candidatureRecueLe) || "—"}</p>
+                              <p className="text-[10px] text-gray-400">{fmt(c.candidatureRecueLe) || "—"}</p>
                             </div>
-                            {c.orientationCandidat && (
-                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${
-                                PIPELINE.find(p => p.key === c.orientationCandidat)?.bg ?? "bg-gray-100"
-                              } ${
-                                PIPELINE.find(p => p.key === c.orientationCandidat)?.text ?? "text-gray-500"
-                              } ${
-                                PIPELINE.find(p => p.key === c.orientationCandidat)?.border ?? "border-gray-200"
-                              }`}>
-                                {PIPELINE.find(p => p.key === c.orientationCandidat)?.label ?? c.orientationCandidat}
+                            {p && (
+                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0"
+                                style={{ backgroundColor: p.bg, color: p.hex, border: `1px solid ${p.border}` }}>
+                                {p.label}
                               </span>
                             )}
                           </button>
-                        ))}
-                    </div>
+                        );
+                      })}
                   </div>
-                )}
+                </div>
               </div>
             )}
           </div>
@@ -366,7 +463,7 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
             {prochains.length === 0 ? (
               <p className="text-sm text-gray-300 text-center py-6">Aucun entretien planifié · 30 jours</p>
             ) : (
-              <div className="space-y-1 max-h-56 overflow-y-auto">
+              <div className="space-y-1 max-h-52 overflow-y-auto">
                 {prochains.slice(0, 8).map(e => {
                   const sal = mine.find(s => s.id === e.salarie_id);
                   if (!sal) return null;
@@ -376,9 +473,7 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
                       onClick={() => { setSelectedSalarie(sal); setPage("fiche"); }}
                       className="w-full text-left flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-indigo-50 transition-colors">
                       <div className="w-8 h-8 rounded-xl bg-indigo-100 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-indigo-700">
-                          {d === 0 ? "Auj." : `${d}j`}
-                        </span>
+                        <span className="text-[10px] font-bold text-indigo-700">{d === 0 ? "Auj." : `${d}j`}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-semibold text-gray-800 truncate">{sal.nom} {sal.prenom}</p>
@@ -393,10 +488,8 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
           </div>
         </Section>
 
-        {/* Objectifs urgents + fins proches */}
         <div className="space-y-4">
-
-          {/* Objectifs à échéance */}
+          {/* Objectifs urgents */}
           <Section>
             <SectionHeader icon="🎯" title="Objectifs urgents" count={objDeadlines.length}
               color="#D97706" action="Planning" onAction={() => setPage("planning")} />
@@ -426,7 +519,7 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
             </div>
           </Section>
 
-          {/* Fins de parcours proches */}
+          {/* Fins de parcours */}
           <Section>
             <SectionHeader icon="⏳" title="Fins de parcours proches" count={finProches.length}
               color="#DC2626" action="Vue PRECO" onAction={() => setPage("preco")} />
@@ -454,10 +547,8 @@ export default function Dashboard({ user, salaries, entretiens, sites = [], setP
               )}
             </div>
           </Section>
-
         </div>
       </div>
-
     </div>
   );
 }

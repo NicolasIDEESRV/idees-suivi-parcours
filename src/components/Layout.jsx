@@ -95,6 +95,8 @@ export default function Layout({ user, children, page, setPage, onLogout, sites 
 
   const adminItems = user.role === "admin"
     ? [{ id: "admin", label: "Administration" }]
+    : user.role === "direction"
+    ? [{ id: "admin", label: "ETPI / ETPP" }]
     : [];
 
   return (
