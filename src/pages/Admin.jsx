@@ -592,6 +592,15 @@ function InviteForm({ sites }) {
 // ─── Heures mensuelles (ETPI / ETPP) ─────────────────────────────────────────
 const MOIS_LABELS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
 
+// Filtre les sites accessibles selon le rôle de l'utilisateur
+// Admin → tous les sites ; Direction/CIP → uniquement les sites assignés
+function filterSitesByUser(sites, user) {
+  if (user.role === "admin") return sites;
+  const ids = user.site_ids ?? (user.site_id ? [user.site_id] : []);
+  if (ids.length === 0) return sites; // sécurité : si non configuré, on montre tout
+  return sites.filter(s => ids.includes(s.id));
+}
+
 function KpiEtp({ label, heures, color }) {
   const etp = heures / 1820;
   return (
@@ -603,7 +612,9 @@ function KpiEtp({ label, heures, color }) {
   );
 }
 
-function HeuresMensuelles({ sites }) {
+function HeuresMensuelles({ sites, user }) {
+  // Restreint l'affichage et la saisie aux sites accessibles de l'utilisateur
+  sites = filterSitesByUser(sites, user);
   const anneeActuelle = new Date().getFullYear();
   const [annee,    setAnnee]   = useState(anneeActuelle);
   const [mois,     setMois]    = useState(new Date().getMonth() + 1); // 1–12
@@ -980,7 +991,7 @@ export default function Admin({ user, sites }) {
 
       {tab === "invite" && <InviteForm sites={sites} />}
       {tab === "users"  && <UserManagement sites={sites} />}
-      {tab === "heures" && <HeuresMensuelles sites={sites} />}
+      {tab === "heures" && <HeuresMensuelles sites={sites} user={user} />}
     </div>
   );
 }
