@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../lib/supabase";
 import { getProfiles, updateProfile } from "../lib/api/profiles";
-import { getHeuresMensuelles, upsertHeuresMensuelles } from "../lib/api/heures";
 import { FInput, FSelect } from "../components/ui";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -589,32 +588,11 @@ function InviteForm({ sites }) {
   );
 }
 
-// ─── Heures mensuelles (ETPI / ETPP) ─────────────────────────────────────────
-const MOIS_LABELS = ["Jan","Fév","Mar","Avr","Mai","Jun","Jul","Aoû","Sep","Oct","Nov","Déc"];
+// ─── (ETPI/ETPP et Formation déplacés dans ChiffresCles.jsx) ─────────────────
 
-// Filtre les sites accessibles selon le rôle de l'utilisateur
-// Admin → tous les sites ; Direction/CIP → uniquement les sites assignés
-function filterSitesByUser(sites, user) {
-  if (user.role === "admin") return sites;
-  const ids = user.site_ids ?? (user.site_id ? [user.site_id] : []);
-  if (ids.length === 0) return sites; // sécurité : si non configuré, on montre tout
-  return sites.filter(s => ids.includes(s.id));
-}
-
-function KpiEtp({ label, heures, color }) {
-  const etp = heures / 1820;
-  return (
-    <div className={`rounded-xl border p-4 text-center ${color === "indigo" ? "bg-indigo-50 border-indigo-200" : "bg-emerald-50 border-emerald-200"}`}>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-2xl font-bold ${color === "indigo" ? "text-indigo-700" : "text-emerald-700"}`}>{etp.toFixed(2)}</p>
-      <p className="text-xs text-gray-400 mt-0.5">{heures.toFixed(0)} h / 1820</p>
-    </div>
-  );
-}
-
-function HeuresMensuelles({ sites, user }) {
-  // Restreint l'affichage et la saisie aux sites accessibles de l'utilisateur
-  sites = filterSitesByUser(sites, user);
+/* eslint-disable no-unused-vars */
+function _Unused() {
+  // supprimé
   const anneeActuelle = new Date().getFullYear();
   const [annee,    setAnnee]   = useState(anneeActuelle);
   const [mois,     setMois]    = useState(new Date().getMonth() + 1); // 1–12
@@ -946,44 +924,31 @@ function HeuresMensuelles({ sites, user }) {
 
 // ─── Page principale ──────────────────────────────────────────────────────────
 export default function Admin({ user, sites }) {
-  const isDirection = user.role === "direction";
-  const [tab, setTab] = useState(isDirection ? "heures" : "invite");
+  const [tab, setTab] = useState("invite");
 
-  if (user.role !== "admin" && user.role !== "direction") {
+  if (user.role !== "admin") {
     return <div className="p-8 text-red-600 text-sm">Accès refusé.</div>;
   }
 
   const tabs = [
-    ...(!isDirection ? [
-      { id: "invite", label: "Inviter un utilisateur" },
-      { id: "users",  label: "Gestion des utilisateurs" },
-    ] : []),
-    { id: "heures", label: "Heures insertion (ETPI/ETPP)" },
+    { id: "invite", label: "Inviter un utilisateur"   },
+    { id: "users",  label: "Gestion des utilisateurs" },
   ];
 
   return (
     <div className="p-8 space-y-6 max-w-6xl">
       <div>
-        <h1 className="text-xl font-bold text-gray-900">
-          {isDirection ? "Heures insertion (ETPI / ETPP)" : "Administration"}
-        </h1>
-        <p className="text-sm text-gray-400 mt-1">
-          {isDirection ? "Suivi des heures par site, filiale et activité." : "Gestion des accès et des utilisateurs."}
-        </p>
+        <h1 className="text-xl font-bold text-gray-900">Administration</h1>
+        <p className="text-sm text-gray-400 mt-1">Gestion des accès et des utilisateurs.</p>
       </div>
 
       {/* Onglets */}
       <div className="flex gap-1 border-b border-gray-200">
         {tabs.map(t => (
-          <button
-            key={t.id}
-            onClick={() => setTab(t.id)}
+          <button key={t.id} onClick={() => setTab(t.id)}
             className={`px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px ${
-              tab === t.id
-                ? "border-indigo-600 text-indigo-600"
-                : "border-transparent text-gray-500 hover:text-gray-700"
-            }`}
-          >
+              tab === t.id ? "border-indigo-600 text-indigo-600" : "border-transparent text-gray-500 hover:text-gray-700"
+            }`}>
             {t.label}
           </button>
         ))}
@@ -991,7 +956,6 @@ export default function Admin({ user, sites }) {
 
       {tab === "invite" && <InviteForm sites={sites} />}
       {tab === "users"  && <UserManagement sites={sites} />}
-      {tab === "heures" && <HeuresMensuelles sites={sites} user={user} />}
     </div>
   );
 }

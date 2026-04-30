@@ -19,6 +19,7 @@ import Stats        from "./pages/Stats";
 import Import       from "./pages/Import";
 import Export       from "./pages/Export";
 import Admin        from "./pages/Admin";
+import ChiffresCles from "./pages/ChiffresCles";
 
 
 // ─── Écran de chargement ──────────────────────────────────────────────────────
@@ -243,6 +244,9 @@ function AppInner({ user, onLogout }) {
           user={user} salaries={salaries} entretiens={entretiens}
           sites={sites} profiles={profiles}
         />
+      )}
+      {page === "chiffres" && (
+        <ChiffresCles user={user} salaries={salaries} sites={sites} />
       )}
       {page === "admin" && (
         <Admin user={user} sites={sites} />

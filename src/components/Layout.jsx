@@ -34,6 +34,11 @@ const NAV_ICONS = {
       <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd"/>
     </svg>
   ),
+  chiffres: (
+    <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
+      <path fillRule="evenodd" d="M6 2a2 2 0 00-2 2v12a2 2 0 002 2h8a2 2 0 002-2V7.414A2 2 0 0015.414 6L12 2.586A2 2 0 0010.586 2H6zm2 10a1 1 0 10-2 0v3a1 1 0 102 0v-3zm2-3a1 1 0 011 1v5a1 1 0 11-2 0v-5a1 1 0 011-1zm4-1a1 1 0 10-2 0v6a1 1 0 102 0V8z" clipRule="evenodd"/>
+    </svg>
+  ),
   stats: (
     <svg viewBox="0 0 20 20" fill="currentColor" className="w-5 h-5">
       <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/>
@@ -76,9 +81,10 @@ const NAV_GROUPS = [
   {
     label: "Données",
     items: [
-      { id: "stats",  label: "Statistiques" },
-      { id: "import", label: "Import" },
-      { id: "export", label: "Export" },
+      { id: "chiffres", label: "Chiffres clés" },
+      { id: "stats",    label: "Statistiques"  },
+      { id: "import",   label: "Import"        },
+      { id: "export",   label: "Export"        },
     ],
   },
 ];
@@ -93,10 +99,13 @@ export default function Layout({ user, children, page, setPage, onLogout, sites 
 
   const roleLabel = { admin: "Administrateur", direction: "Direction", cip: "CIP" }[user.role] ?? user.role;
 
+  // "Chiffres clés" accessible admin + direction
+  const chiffresItem = (user.role === "admin" || user.role === "direction")
+    ? [{ id: "chiffres", label: "Chiffres clés" }]
+    : [];
+  // "Administration" accessible admin uniquement
   const adminItems = user.role === "admin"
     ? [{ id: "admin", label: "Administration" }]
-    : user.role === "direction"
-    ? [{ id: "admin", label: "ETPI / ETPP" }]
     : [];
 
   return (
@@ -117,7 +126,11 @@ export default function Layout({ user, children, page, setPage, onLogout, sites 
                 {group.label}
               </p>
               <div className="space-y-0.5">
-                {group.items.map(item => {
+                {group.items.filter(item => {
+                  // "Chiffres clés" visible uniquement pour admin et direction
+                  if (item.id === "chiffres") return user.role === "admin" || user.role === "direction";
+                  return true;
+                }).map(item => {
                   const active = page === item.id;
                   return (
                     <button
@@ -141,7 +154,7 @@ export default function Layout({ user, children, page, setPage, onLogout, sites 
             </div>
           ))}
 
-          {/* Admin */}
+          {/* Administration (admin uniquement) */}
           {adminItems.length > 0 && (
             <div>
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-2 mb-1.5">
