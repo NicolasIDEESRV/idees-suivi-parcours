@@ -323,6 +323,7 @@ function buildStats(pop) {
       { l: "DELD",         n: pop.filter(s => s.deld).length,         c: "#7C3AED" },
       { l: "BRSA",         n: pop.filter(s => s.brsa).length,         c: "#2563EB" },
       { l: "TH",           n: pop.filter(s => s.th).length,           c: "#0891B2" },
+      { l: "RQTH",         n: pop.filter(s => s.rqth).length,         c: "#0E7490" },
       { l: "ASS",          n: pop.filter(s => s.ass).length,          c: "#D97706" },
       { l: "Résident QPV", n: pop.filter(s => s.residentQPV).length,  c: "#059669" },
     ],
