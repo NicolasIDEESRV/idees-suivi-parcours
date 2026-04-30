@@ -169,6 +169,13 @@ export const mapSalarieFromDB = (row) => ({
   // Multi-sites : priorité au nouveau champ, fallback sur l'ancien (rétrocompat)
   orientationSiteIds:  row.orientation_site_ids   ?? (row.orientation_site_id ? [row.orientation_site_id] : []),
   activitesPrio:       row.activites_prio         ?? [],
+  // Entretien candidat — champs complémentaires
+  autreAccompagnateur: row.autre_accompagnateur   ?? "",
+  enRecherchDepuis:    row.en_recherche_depuis    ?? "",
+  pieceIdentite:       row.piece_identite         ?? "",
+  titreSejourValidite: row.titre_sejour_validite  ?? "",
+  contraintePhysique:  row.contrainte_physique    ?? "",
+  contrainteHoraire:   row.contrainte_horaire     ?? "",
   // Sécurité sociale
   numSecuSociale:      row.num_secu_sociale       ?? "",
 });
@@ -291,6 +298,13 @@ export const mapSalarieToDB = (obj) => ({
   orientation_site_ids:  obj.orientationSiteIds  ?? [],
   orientation_site_id:   obj.orientationSiteIds?.[0] ?? null,  // rétrocompat
   activites_prio:        obj.activitesPrio       ?? [],
+  // Entretien candidat — champs complémentaires
+  autre_accompagnateur:  obj.autreAccompagnateur || null,
+  en_recherche_depuis:   obj.enRecherchDepuis    || null,
+  piece_identite:        obj.pieceIdentite       || null,
+  titre_sejour_validite: obj.titreSejourValidite || null,
+  contrainte_physique:   obj.contraintePhysique  || null,
+  contrainte_horaire:    obj.contrainteHoraire   || null,
   // Sécurité sociale
   num_secu_sociale:      obj.numSecuSociale      || null,
 });

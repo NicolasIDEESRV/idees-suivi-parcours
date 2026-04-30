@@ -244,6 +244,27 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                   ))}
                 </div>
               </div>
+
+              {/* ── Champs CANDIDAT : accompagnement & identification ── */}
+              {form.isCandidat && (
+                <>
+                  <FSec>Accompagnement</FSec>
+                  <FSelect label="Prescripteur" value={form.prescripteur} onChange={e => upd("prescripteur", e.target.value)}>
+                    {PRESCRIPTEURS.map(p => <option key={p}>{p}</option>)}
+                  </FSelect>
+                  <FInput label="Référent prescripteur" value={form.nomPrenomPrescripteur}
+                    onChange={e => upd("nomPrenomPrescripteur", e.target.value)}
+                    placeholder="Prénom NOM, organisme" />
+                  <FInput label="Autre accompagnateur" value={form.autreAccompagnateur}
+                    onChange={e => upd("autreAccompagnateur", e.target.value)}
+                    placeholder="CIP, AS, ML, autre organisme…" />
+                  <FSelect label="En recherche active depuis" value={form.enRecherchDepuis}
+                    onChange={e => upd("enRecherchDepuis", e.target.value)}>
+                    <option value="">—</option>
+                    {["Moins de 6 mois","6 à 12 mois","1 à 2 ans","2 à 5 ans","Plus de 5 ans"].map(o => <option key={o}>{o}</option>)}
+                  </FSelect>
+                </>
+              )}
             </div>
           )}
 

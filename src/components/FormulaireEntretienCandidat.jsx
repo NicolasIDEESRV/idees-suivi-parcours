@@ -203,9 +203,6 @@ export default function FormulaireEntretienCandidat({
     projetPro:            salarie.projetPro || "",
     accompagnementEnCours: "",   // sur quoi travaille-t-il dans son accompagnement ?
     parcoursResume:       "",    // résumé du parcours
-    q1Declencheur:        "",    // Q1 — déclencheur
-    q2Confiance:          "",    // Q2 — confiance en soi
-    q3Choix:              "",    // Q3 — sentiment de choix
 
     // ── 4. Freins
     freinsEntree: { ...(salarie.freinsEntree || {}) },
@@ -245,9 +242,6 @@ export default function FormulaireEntretienCandidat({
       if (form.connaitSalarie !== null)             lignes.push(`Connaît un salarié : ${form.connaitSalarie ? `Oui — ${form.connaitSalarieLequel}` : "Non"}`);
       if (form.accompagnementEnCours)               lignes.push(`Accompagnement en cours : ${form.accompagnementEnCours}`);
       if (form.parcoursResume)                      lignes.push(`Parcours : ${form.parcoursResume}`);
-      if (form.q1Declencheur)                       lignes.push(`Q1 — Déclencheur : ${form.q1Declencheur}`);
-      if (form.q2Confiance)                         lignes.push(`Q2 — Confiance en soi : ${form.q2Confiance}`);
-      if (form.q3Choix)                             lignes.push(`Q3 — Sentiment de choix : ${form.q3Choix}`);
       if (form.horaireCapable)                      lignes.push(`Horaires : ${form.horaireCapable === "oui" ? "OK" : form.horaireCapable === "reserve" ? `Réserve — ${form.horaireMotif}` : `Non — ${form.horaireMotif}`}`);
 
       await onSaveEntretien({
@@ -608,41 +602,6 @@ export default function FormulaireEntretienCandidat({
                   rows={3} placeholder="Historique professionnel, contexte personnel pertinent…" />
               </div>
 
-              {/* 3 questions motivation */}
-              <div className="space-y-4">
-                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 space-y-2">
-                  <p className="text-xs font-bold text-indigo-800">Q1 — Déclencheur</p>
-                  <p className="text-xs text-indigo-600 italic">
-                    « Qu'est-ce qui vous a donné envie d'engager une démarche d'accompagnement et de recherche d'emploi ? »
-                  </p>
-                  <p className="text-xs text-indigo-400">→ Initiative personnelle / événement déclencheur / pression externe</p>
-                  <FTextarea label="" value={form.q1Declencheur}
-                    onChange={e => upd("q1Declencheur", e.target.value)}
-                    rows={2} placeholder="Réponse du candidat…" />
-                </div>
-
-                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 space-y-2">
-                  <p className="text-xs font-bold text-indigo-800">Q2 — Confiance en soi</p>
-                  <p className="text-xs text-indigo-600 italic">
-                    « Qu'est-ce qui vous rend confiant dans votre capacité à mener à bien votre projet ? »
-                  </p>
-                  <p className="text-xs text-indigo-400">→ Ressources mobilisées, expériences passées, soutien entourage</p>
-                  <FTextarea label="" value={form.q2Confiance}
-                    onChange={e => upd("q2Confiance", e.target.value)}
-                    rows={2} placeholder="Réponse du candidat…" />
-                </div>
-
-                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100 space-y-2">
-                  <p className="text-xs font-bold text-indigo-800">Q3 — Sentiment de choix</p>
-                  <p className="text-xs text-indigo-600 italic">
-                    « Avez-vous le sentiment d'avoir choisi ce parcours ou d'y avoir été poussé ? »
-                  </p>
-                  <p className="text-xs text-indigo-400">→ Adhésion réelle / contrainte / ambivalence à travailler en accompagnement</p>
-                  <FTextarea label="" value={form.q3Choix}
-                    onChange={e => upd("q3Choix", e.target.value)}
-                    rows={2} placeholder="Réponse du candidat…" />
-                </div>
-              </div>
             </div>
           )}
 
