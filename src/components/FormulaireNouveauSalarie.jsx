@@ -218,7 +218,8 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
               <FSec>Publics prioritaires</FSec>
               <div className="col-span-2 grid grid-cols-2 gap-3">
                 <FCheck label="DELD"         checked={form.deld}        onChange={e => upd("deld",        e.target.checked)} />
-                <FCheck label="TH / RQTH"    checked={form.th}          onChange={e => upd("th",          e.target.checked)} />
+                <FCheck label="TH"           checked={form.th}          onChange={e => upd("th",          e.target.checked)} />
+                <FCheck label="RQTH"         checked={form.rqth}        onChange={e => upd("rqth",        e.target.checked)} />
                 <FCheck label="Résident QPV" checked={form.residentQPV} onChange={e => upd("residentQPV", e.target.checked)} />
               </div>
               <div className="col-span-2">
@@ -475,6 +476,7 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
                   {form.deld && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">DELD</span>}
                   {form.brsa && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">BRSA</span>}
                   {form.th   && <span className="text-xs bg-blue-100  text-blue-700  px-2 py-0.5 rounded-full">TH</span>}
+                  {form.rqth && <span className="text-xs bg-blue-200  text-blue-800  px-2 py-0.5 rounded-full">RQTH</span>}
                 </div>
               </div>
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">

@@ -180,6 +180,7 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
                 {salarie.deld       && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">DELD</span>}
                 {salarie.brsa       && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">BRSA</span>}
                 {salarie.th         && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">TH</span>}
+                {salarie.rqth       && <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full font-semibold">RQTH</span>}
                 {salarie.residentQPV && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">QPV</span>}
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${salarie.dateSortie ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"}`}>
                   {salarie.dateSortie ? "Sorti" : "Actif"}

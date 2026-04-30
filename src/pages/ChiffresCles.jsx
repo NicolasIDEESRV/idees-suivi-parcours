@@ -759,6 +759,7 @@ async function exportToExcel({ annee, nomStructure, kpis }) {
     ["DELD - Demandeur d'Emploi Longue Durée", kpis.deldN],
     ["BRSA - Bénéficiaire du RSA",              kpis.brsaN],
     ["TH - Travailleur Handicapé",              kpis.thN],
+    ["RQTH - Reconnaissance Qualité TH",        kpis.rqthN],
     ["ASS - Allocation Solidarité Spécifique",  kpis.assN],
     ["SANS RESSOURCES",                         kpis.sansRessN],
     ["RÉSIDENT QPV",                            kpis.qpvN],
@@ -877,6 +878,7 @@ function SyntheseTab({ salaries, sites, user }) {
   const deldN     = actifs.filter(s => s.deld).length;
   const brsaN     = actifs.filter(s => s.brsa).length;
   const thN       = actifs.filter(s => s.th).length;
+  const rqthN     = actifs.filter(s => s.rqth).length;
   const assN      = actifs.filter(s => s.ass).length;
   const sansRessN = actifs.filter(s => s.sansRessources).length;
   const qpvN      = actifs.filter(s => s.residentQPV).length;
@@ -919,7 +921,7 @@ function SyntheseTab({ salaries, sites, user }) {
     niv5_8, niv4, niv3,
     prescrCount,
     siAccueillis, siInscrits,
-    deldN, brsaN, thN, assN, sansRessN, qpvN,
+    deldN, brsaN, thN, rqthN, assN, sansRessN, qpvN,
     dynamiques, durables, transitions, positives, essais,
     totalSortiesPlus3, retraits, sortiesMoins3, totalSorties,
     heuresMoyennes, moisMoyen,
@@ -1020,6 +1022,7 @@ function SyntheseTab({ salaries, sites, user }) {
             <KpiRow label="DELD — Demandeur d'Emploi Longue Durée" unite="NB" valeur={deldN}     ratio={pct(deldN,     totalActifs)} />
             <KpiRow label="BRSA — Bénéficiaire du RSA"             unite="NB" valeur={brsaN}     ratio={pct(brsaN,     totalActifs)} />
             <KpiRow label="TH — Travailleur Handicapé"             unite="NB" valeur={thN}       ratio={pct(thN,       totalActifs)} />
+            <KpiRow label="RQTH — Reconnaissance Qualité TH"       unite="NB" valeur={rqthN}     ratio={pct(rqthN,     totalActifs)} />
             <KpiRow label="ASS — Allocation Solidarité Spécifique" unite="NB" valeur={assN}      ratio={pct(assN,      totalActifs)} />
             <KpiRow label="Sans ressources"                        unite="NB" valeur={sansRessN} ratio={pct(sansRessN, totalActifs)} />
             <KpiRow label="Résident QPV"                           unite="NB" valeur={qpvN}      ratio={pct(qpvN,      totalActifs)} />

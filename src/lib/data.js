@@ -22,7 +22,7 @@ export const newSal = (o = {}) => ({
   prescripteur: "FRANCE TRAVAIL", nomPrenomPrescripteur: "",
   suiviSPIP: false, coordSPIP: "", commentaires: "", suiviSocial: "",
   statutAccueil: "Inscrit", deld: false, dureeCHomageMois: 0,
-  brsa: false, th: false, ass: false, sansRessources: false, residentQPV: false,
+  brsa: false, th: false, rqth: false, ass: false, sansRessources: false, residentQPV: false,
   heuresTravaillees: 0,
   niveauFormation: "Niveau 3 (CAP/BEP et moins)",
   cv: false, niveauLangue: "A1", projetPro: "", domainesPro: ["", "", ""],
