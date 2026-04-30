@@ -523,18 +523,6 @@ function FormationTab({ sites, user }) {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      {/* Note migration */}
-      <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
-        <p className="font-semibold mb-1">⚠ Migration base de données requise</p>
-        <p>Ces données nécessitent 5 colonnes supplémentaires dans la table <code className="bg-amber-100 px-1 rounded">heures_mensuelles</code>. Exécutez ce SQL dans Supabase :</p>
-        <pre className="mt-2 bg-amber-100 rounded p-2 text-[11px] overflow-x-auto leading-relaxed">{`ALTER TABLE heures_mensuelles
-  ADD COLUMN IF NOT EXISTS nb_insertion_formes         integer DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS heures_formation_insertion  numeric DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS nb_permanents_formes        integer DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS heures_formation_permanents numeric DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS budget_formation            numeric DEFAULT 0;`}</pre>
-      </div>
-
       {/* Sélecteur année */}
       <div className="flex items-center gap-4">
         <div className="flex items-center gap-2 border border-gray-200 rounded-xl overflow-hidden">
