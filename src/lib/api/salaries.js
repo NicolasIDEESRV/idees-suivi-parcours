@@ -100,13 +100,17 @@ export async function sortirSalarie(id, sortieForm) {
  * @param {string} numSecu
  * @param {string|null} excludeId - ID du salarié à exclure (pour les modifications)
  */
+// Vérifie qu'un string est un UUID valide (format Supabase)
+const isUUID = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
 export async function checkNumSecuUnique(numSecu, excludeId = null) {
   if (!numSecu || !numSecu.trim()) return [];
   let q = supabase
     .from("salaries")
     .select("id, nom, prenom, is_candidat, site_id")
     .eq("num_secu_sociale", numSecu.trim());
-  if (excludeId) q = q.neq("id", excludeId);
+  // N'exclure que si c'est un vrai UUID (pas un ID mock local type "sal123...")
+  if (excludeId && isUUID(excludeId)) q = q.neq("id", excludeId);
   const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
