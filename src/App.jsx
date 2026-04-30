@@ -67,18 +67,15 @@ function AppInner({ user, onLogout }) {
   const navigate = (p, s = null) => { if (s) setSel(s); setPage(p); };
 
   // ── Sauvegarde salarié ───────────────────────────────────────────────────────
+  // Pas de try/catch ici : on laisse l'erreur remonter au formulaire appelant
   const onSaveSal = async (form) => {
-    try {
-      const { salarie, jalonsPersisted } = await handleSaveSal(form);
-      setShowNew(false);
-      setShowNewCand(false);
-      setEditSal(null);
-      if (page === "fiche") setSel(salarie);
-      if (jalonsPersisted.length > 0) {
-        setJalonModal({ jalons: jalonsPersisted });
-      }
-    } catch (e) {
-      alert("Erreur lors de l'enregistrement : " + e.message);
+    const { salarie, jalonsPersisted } = await handleSaveSal(form);
+    setShowNew(false);
+    setShowNewCand(false);
+    setEditSal(null);
+    if (page === "fiche") setSel(salarie);
+    if (jalonsPersisted.length > 0) {
+      setJalonModal({ jalons: jalonsPersisted });
     }
   };
 

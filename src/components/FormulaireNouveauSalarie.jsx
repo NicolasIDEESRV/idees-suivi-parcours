@@ -124,9 +124,9 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
           return;
         }
       }
-      onSave(form);
+      await onSave(form);
     } catch (e) {
-      setSaveErr("Erreur lors de la vérification : " + e.message);
+      setSaveErr("Erreur lors de l'enregistrement : " + e.message);
     } finally {
       setSaving(false);
     }
