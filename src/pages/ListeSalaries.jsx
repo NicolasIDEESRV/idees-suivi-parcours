@@ -33,23 +33,51 @@ function ConfirmDeleteModal({ count, onConfirm, onCancel, loading }) {
 
 // ─── Composant principal ──────────────────────────────────────────────────────
 export default function ListeSalaries({ user, salaries, sites = [], setPage, setSelectedSalarie, onNew, onOpenSortie, onDeleteMany }) {
-  const [search,     setSearch]     = useState("");
-  const [fs,         setFs]         = useState("actifs");
-  const [selected,   setSelected]   = useState(new Set());   // IDs sélectionnés
-  const [confirmDel, setConfirmDel] = useState(false);
-  const [deleting,   setDeleting]   = useState(false);
-  const [sortCol,    setSortCol]    = useState("nom");
-  const [sortDir,    setSortDir]    = useState(1); // 1 = asc, -1 = desc
+  const [search,         setSearch]         = useState("");
+  const [fs,             setFs]             = useState("actifs");
+  const [selected,       setSelected]       = useState(new Set());   // IDs sélectionnés
+  const [confirmDel,     setConfirmDel]     = useState(false);
+  const [deleting,       setDeleting]       = useState(false);
+  const [sortCol,        setSortCol]        = useState("nom");
+  const [sortDir,        setSortDir]        = useState(1); // 1 = asc, -1 = desc
+  const [filterFiliale,  setFilterFiliale]  = useState("");
+  const [filterSecteur,  setFilterSecteur]  = useState("");
+  const [filterActivite, setFilterActivite] = useState("");
+  const [filterSite,     setFilterSite]     = useState("");
 
   const isAdmin = user.role === "admin";
 
-  const scopeIds = getScopeIds(user, sites);
+  const scopeIds     = getScopeIds(user, sites);
+  const sitesInScope = scopeIds === null ? sites : sites.filter(s => scopeIds.includes(s.id));
+
+  // ── Options filtres hiérarchiques ────────────────────────────────────────────
+  const filiales    = [...new Set(sitesInScope.map(s => s.filiale).filter(Boolean))].sort((a,b) => a.localeCompare(b,"fr"));
+  const sitesF      = filterFiliale  ? sitesInScope.filter(s => s.filiale  === filterFiliale)  : sitesInScope;
+  const secteurs    = [...new Set(sitesF.map(s => s.secteur).filter(Boolean))].sort((a,b) => a.localeCompare(b,"fr"));
+  const sitesS      = filterSecteur  ? sitesF.filter(s => s.secteur  === filterSecteur)  : sitesF;
+  const activites   = [...new Set(sitesS.map(s => s.activite).filter(Boolean))].sort((a,b) => a.localeCompare(b,"fr"));
+  const sitesA      = filterActivite ? sitesS.filter(s => s.activite === filterActivite) : sitesS;
+  const siteOpts    = [...sitesA].sort((a,b) => (a.nom||"").localeCompare(b.nom||"","fr"));
+  const anyFilter   = filterFiliale || filterSecteur || filterActivite || filterSite;
+
+  const onFilialeChange  = v => { setFilterFiliale(v);  setFilterSecteur(""); setFilterActivite(""); setFilterSite(""); setSelected(new Set()); };
+  const onSecteurChange  = v => { setFilterSecteur(v);  setFilterActivite(""); setFilterSite(""); setSelected(new Set()); };
+  const onActiviteChange = v => { setFilterActivite(v); setFilterSite(""); setSelected(new Set()); };
+  const onSiteChange     = v => { setFilterSite(v);     setSelected(new Set()); };
+  const resetFilters     = () => { setFilterFiliale(""); setFilterSecteur(""); setFilterActivite(""); setFilterSite(""); setSelected(new Set()); };
+
   const mine = scopeIds === null ? salaries : salaries.filter(s => scopeIds.includes(s.site_id));
-  const list = mine.filter(s =>
-    !s.isCandidat &&   // les candidats sont gérés dans la page Candidats
-    `${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase()) &&
-    (fs === "tous" || (fs === "actifs" && !s.dateSortie) || (fs === "sortis" && s.dateSortie))
-  );
+  const list = mine.filter(s => {
+    if (s.isCandidat) return false;
+    if (!`${s.nom} ${s.prenom}`.toLowerCase().includes(search.toLowerCase())) return false;
+    if (!(fs === "tous" || (fs === "actifs" && !s.dateSortie) || (fs === "sortis" && s.dateSortie))) return false;
+    const site = sites.find(x => x.id === s.site_id);
+    if (filterFiliale  && site?.filiale  !== filterFiliale)  return false;
+    if (filterSecteur  && site?.secteur  !== filterSecteur)  return false;
+    if (filterActivite && site?.activite !== filterActivite) return false;
+    if (filterSite     && s.site_id      !== filterSite)     return false;
+    return true;
+  });
 
   const sorted = [...list].sort((a, b) => {
     let va = a[sortCol] ?? "";
@@ -116,7 +144,7 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
       </div>
 
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
-        {/* ── Barre de recherche / filtres ── */}
+        {/* ── Barre de recherche / filtres statut ── */}
         <div className="p-4 border-b border-gray-100 flex gap-3 flex-wrap items-center">
           <input
             className="flex-1 min-w-40 border border-gray-200 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200"
@@ -133,6 +161,47 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
             ))}
           </div>
         </div>
+
+        {/* ── Filtres hiérarchiques filiale / secteur / activité / site ── */}
+        {sitesInScope.length > 1 && (
+          <div className="px-4 py-2.5 border-b border-gray-100 flex gap-2 flex-wrap items-center">
+            <span className="text-xs text-gray-400 font-medium">Filtrer :</span>
+            {filiales.length > 1 && (
+              <select value={filterFiliale} onChange={e => onFilialeChange(e.target.value)}
+                className={`text-sm rounded-xl px-3 py-1.5 border focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white ${filterFiliale ? "border-indigo-300 text-indigo-700 font-medium" : "border-gray-200 text-gray-600"}`}>
+                <option value="">Toutes les filiales</option>
+                {filiales.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+            )}
+            {secteurs.length > 0 && (
+              <select value={filterSecteur} onChange={e => onSecteurChange(e.target.value)}
+                className={`text-sm rounded-xl px-3 py-1.5 border focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white ${filterSecteur ? "border-indigo-300 text-indigo-700 font-medium" : "border-gray-200 text-gray-600"}`}>
+                <option value="">Tous les secteurs</option>
+                {secteurs.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            )}
+            {activites.length > 0 && (
+              <select value={filterActivite} onChange={e => onActiviteChange(e.target.value)}
+                className={`text-sm rounded-xl px-3 py-1.5 border focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white ${filterActivite ? "border-indigo-300 text-indigo-700 font-medium" : "border-gray-200 text-gray-600"}`}>
+                <option value="">Toutes les activités</option>
+                {activites.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+            )}
+            {siteOpts.length > 1 && (
+              <select value={filterSite} onChange={e => onSiteChange(e.target.value)}
+                className={`text-sm rounded-xl px-3 py-1.5 border focus:outline-none focus:ring-2 focus:ring-indigo-200 bg-white ${filterSite ? "border-indigo-300 text-indigo-700 font-medium" : "border-gray-200 text-gray-600"}`}>
+                <option value="">Tous les sites</option>
+                {siteOpts.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              </select>
+            )}
+            {anyFilter && (
+              <button onClick={resetFilters}
+                className="text-xs text-gray-400 hover:text-red-500 px-2.5 py-1.5 rounded-lg hover:bg-red-50 transition-colors border border-transparent hover:border-red-100">
+                ✕ Réinitialiser
+              </button>
+            )}
+          </div>
+        )}
 
         {/* ── Barre d'action sélection (admin) ── */}
         {isAdmin && someSelected && (
@@ -241,9 +310,14 @@ export default function ListeSalaries({ user, salaries, sites = [], setPage, set
 
         {/* Compteur bas de page */}
         {list.length > 0 && (
-          <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400">
-            {list.length} salarié{list.length > 1 ? "s" : ""}
-            {isAdmin && selectedCount > 0 && ` · ${selectedCount} sélectionné${selectedCount > 1 ? "s" : ""}`}
+          <div className="px-4 py-2.5 border-t border-gray-100 text-xs text-gray-400 flex items-center justify-between">
+            <span>
+              {list.length} salarié{list.length > 1 ? "s" : ""}
+              {anyFilter && <span className="ml-1 text-indigo-400 font-medium">· filtre actif</span>}
+            </span>
+            {isAdmin && selectedCount > 0 && (
+              <span>{selectedCount} sélectionné{selectedCount > 1 ? "s" : ""}</span>
+            )}
           </div>
         )}
       </div>
