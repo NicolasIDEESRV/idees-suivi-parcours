@@ -1,9 +1,15 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { supabase } from "../lib/supabase";
 import { getMyProfile } from "../lib/api/profiles";
 
 // ─── Contexte ─────────────────────────────────────────────────────────────────
 const AuthContext = createContext(null);
+
+/** Délai d'inactivité avant déconnexion automatique : 30 minutes */
+const INACTIVITY_DELAY_MS = 30 * 60 * 1000;
+
+/** Événements utilisateur considérés comme "activité" */
+const ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "touchstart", "scroll", "click"];
 
 /**
  * Fournit la session Supabase et le profil applicatif (rôle, site…).
@@ -14,6 +20,32 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(false);
   const [authError, setAuthError] = useState(null);
+  const inactivityTimer = useRef(null);
+
+  // ── Déconnexion automatique après inactivité ─────────────────────────────────
+  useEffect(() => {
+    if (!session) {
+      // Pas de session → aucun timer à gérer
+      clearTimeout(inactivityTimer.current);
+      return;
+    }
+
+    const resetTimer = () => {
+      clearTimeout(inactivityTimer.current);
+      inactivityTimer.current = setTimeout(() => {
+        supabase.auth.signOut();
+      }, INACTIVITY_DELAY_MS);
+    };
+
+    // Lancer le timer et l'écoute d'activité
+    ACTIVITY_EVENTS.forEach(evt => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      clearTimeout(inactivityTimer.current);
+      ACTIVITY_EVENTS.forEach(evt => window.removeEventListener(evt, resetTimer));
+    };
+  }, [session]);
 
   // ── Chargement initial + écoute des changements de session ──────────────────
   useEffect(() => {
