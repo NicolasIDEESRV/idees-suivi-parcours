@@ -7,6 +7,24 @@ import EntretienForm from "../components/EntretienForm";
 import FormulaireEntretienCandidat from "../components/FormulaireEntretienCandidat";
 import FormulaireDeclinerCandidat from "../components/FormulaireDeclinerCandidat";
 
+// ─── Badges candidat (impression / orientation) ──────────────────────────────
+const IMP_STYLE = {
+  tres_bien: "bg-green-100 text-green-800 border-green-200",
+  bien:      "bg-blue-100  text-blue-800  border-blue-200",
+  doute:     "bg-orange-100 text-orange-800 border-orange-200",
+  decliner:  "bg-red-100   text-red-800   border-red-200",
+};
+const IMP_LABEL = { tres_bien: "Très bien", bien: "Bien", doute: "Doute", decliner: "À décliner" };
+
+const ORI_STYLE = {
+  evaluation: "bg-orange-100 text-orange-800 border-orange-200",
+  recrute:    "bg-green-100  text-green-800  border-green-200",
+  vivier:     "bg-blue-100   text-blue-800   border-blue-200",
+  decliner:   "bg-red-100    text-red-800    border-red-200",
+  interim:    "bg-purple-100 text-purple-800 border-purple-200",
+};
+const ORI_LABEL = { evaluation: "Évaluation", recrute: "Recruté", vivier: "Vivier", decliner: "Décliné", interim: "Intérim (ancien)" };
+
 // ─── Définition des champs suivis pour la complétude ─────────────────────────
 const CHAMPS = [
   { key: "dateNaissance",         label: "Date de naissance",      cat: "État civil"  },
@@ -229,6 +247,26 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${salarie.dateSortie ? "bg-gray-100 text-gray-500" : "bg-green-100 text-green-700"}`}>
                   {salarie.dateSortie ? "Sorti" : "Actif"}
                 </span>
+                {/* Badges candidat : impression, orientation, sites pressentis */}
+                {salarie.isCandidat && salarie.impressionGlobale && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${IMP_STYLE[salarie.impressionGlobale] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                    {IMP_LABEL[salarie.impressionGlobale] || salarie.impressionGlobale}
+                  </span>
+                )}
+                {salarie.isCandidat && salarie.orientationCandidat && (
+                  <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${ORI_STYLE[salarie.orientationCandidat] || "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                    {ORI_LABEL[salarie.orientationCandidat] || salarie.orientationCandidat}
+                  </span>
+                )}
+                {salarie.isCandidat && salarie.orientationSiteIds?.length > 0 &&
+                  salarie.orientationSiteIds.map(id => {
+                    const site = sites.find(x => x.id === id);
+                    const name = site ? [site.filiale, site.nom].filter(Boolean).join(" › ") : null;
+                    return name ? (
+                      <span key={id} className="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full border border-indigo-100 whitespace-nowrap">{name}</span>
+                    ) : null;
+                  })
+                }
               </div>
             </div>
           </div>
