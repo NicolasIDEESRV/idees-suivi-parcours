@@ -187,20 +187,10 @@ export const mapSalarieFromDB = (row) => ({
  * Candidat JS → payload DB.
  *
  * Colonnes date contrat (date_entree, date_fin_contrat, date_fin_agrement) :
- *   - Idéalement NULL (candidat pas encore embauché).
- *   - Mais si la DB a encore une contrainte NOT NULL sans DEFAULT, on envoie
- *     la date du jour comme valeur sentinelle neutre — elle sera écrasée lors
- *     de la conversion candidat → salarié.
- *
- * Migration recommandée (Supabase SQL Editor) :
- *   ALTER TABLE salaries ALTER COLUMN date_entree      DROP NOT NULL;
- *   ALTER TABLE salaries ALTER COLUMN date_fin_contrat  DROP NOT NULL;
- *   ALTER TABLE salaries ALTER COLUMN date_fin_agrement DROP NOT NULL;
+ *   NULL pour les candidats pas encore embauchés.
+ *   Contrainte NOT NULL supprimée via migration_previous_passage.sql.
  */
-const _today = () => new Date().toISOString().split("T")[0];
-
 export const mapCandidatToDB = (obj) => {
-  const today = _today();
   return {
     site_id: obj.site_id,
     cip_id:  obj.cip_id,
@@ -243,7 +233,15 @@ export const mapCandidatToDB = (obj) => {
     niveau_langue: obj.niveauLangue || null,
     projet_pro:    obj.projetPro    || null,
 
-    // Candidat
+    // Candidat — champs de suivi mis à jour lors des entretiens (colonnes existantes)
+    vu_entretien_le:      obj.vuEntretienLe      || null,
+    appeler_le:           obj.appelerLe          || null,
+    impression_globale:   obj.impressionGlobale  || null,
+    impression_detail:    obj.impressionDetail   || null,
+    orientation_candidat: obj.orientationCandidat || null,
+    orientation_motif:    obj.orientationMotif   || null,
+
+    // Candidat — création
     is_candidat:          true,
     candidature_recue_le: obj.candidatureRecueLe || null,
     message_candidature:  obj.messageCandidature  || null,
@@ -252,6 +250,16 @@ export const mapCandidatToDB = (obj) => {
     num_secu_sociale: obj.numSecuSociale || null,
     // Passage précédent
     previous_salarie_id: obj.previousSalarieId || null,
+
+    // Informations collectées lors de l'entretien candidat
+    // ⚠ Requiert migration_candidat_columns.sql pour exister en DB
+    autre_accompagnateur:  obj.autreAccompagnateur  || null,
+    en_recherche_depuis:   obj.enRecherchDepuis     || null,
+    piece_identite:        obj.pieceIdentite        || null,
+    titre_sejour_validite: obj.titreSejourValidite  || null,
+    contrainte_physique:   obj.contraintePhysique   || null,
+    contrainte_horaire:    obj.contrainteHoraire    || null,
+    orientation_site_ids:  (obj.orientationSiteIds?.length > 0) ? obj.orientationSiteIds : null,
   };
 };
 
@@ -375,10 +383,15 @@ export const mapSalarieToDB = (obj) => ({
   num_secu_sociale:     obj.numSecuSociale      || null,
   // Passage précédent
   previous_salarie_id:  obj.previousSalarieId   || null,
-  // NOTE : colonnes à ajouter via migration si besoin :
-  // activites_prio, orientation_site_ids, orientation_site_id,
-  // autre_accompagnateur, en_recherche_depuis, piece_identite,
-  // titre_sejour_validite, contrainte_physique, contrainte_horaire
+  // Informations collectées lors de l'entretien candidat
+  // ⚠ Requiert migration_candidat_columns.sql pour exister en DB
+  autre_accompagnateur:  obj.autreAccompagnateur  || null,
+  en_recherche_depuis:   obj.enRecherchDepuis     || null,
+  piece_identite:        obj.pieceIdentite        || null,
+  titre_sejour_validite: obj.titreSejourValidite  || null,
+  contrainte_physique:   obj.contraintePhysique   || null,
+  contrainte_horaire:    obj.contrainteHoraire    || null,
+  orientation_site_ids:  (obj.orientationSiteIds?.length > 0) ? obj.orientationSiteIds : null,
 });
 
 // ─── ENTRETIEN ────────────────────────────────────────────────────────────────

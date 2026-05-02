@@ -32,10 +32,13 @@ export async function createSalarie(form) {
 
 /**
  * Met à jour un salarié ou candidat existant.
- * Pour les candidats, utilise le mapper allégé.
+ * Utilise toujours le mapper complet (mapSalarieToDB) pour les mises à jour,
+ * car les colonnes date_entree/date_fin_contrat/date_fin_agrement sont nullable
+ * depuis la migration migration_previous_passage.sql.
+ * → évite la perte des champs candidat (impression_globale, orientation_candidat…)
  */
 export async function updateSalarie(id, form) {
-  const payload = form.isCandidat ? mapCandidatToDB(form) : mapSalarieToDB(form);
+  const payload = mapSalarieToDB(form);
   const { data, error } = await supabase
     .from("salaries")
     .update(payload)
