@@ -1,5 +1,5 @@
 import { supabase } from "../supabase";
-import { mapSalarieFromDB, mapSalarieToDB } from "../mappers";
+import { mapSalarieFromDB, mapSalarieToDB, mapCandidatToDB } from "../mappers";
 
 /**
  * Récupère tous les salariés visibles (RLS appliqué automatiquement) :
@@ -16,11 +16,11 @@ export async function getSalaries() {
 }
 
 /**
- * Crée un nouveau salarié.
- * Retourne l'objet JS mappé (avec l'id UUID généré par Supabase).
+ * Crée un nouveau salarié OU candidat.
+ * Utilise un mapper allégé pour les candidats (évite les NOT NULL sur les colonnes contrat).
  */
 export async function createSalarie(form) {
-  const payload = mapSalarieToDB(form);
+  const payload = form.isCandidat ? mapCandidatToDB(form) : mapSalarieToDB(form);
   const { data, error } = await supabase
     .from("salaries")
     .insert(payload)
@@ -31,10 +31,11 @@ export async function createSalarie(form) {
 }
 
 /**
- * Met à jour un salarié existant.
+ * Met à jour un salarié ou candidat existant.
+ * Pour les candidats, utilise le mapper allégé.
  */
 export async function updateSalarie(id, form) {
-  const payload = mapSalarieToDB(form);
+  const payload = form.isCandidat ? mapCandidatToDB(form) : mapSalarieToDB(form);
   const { data, error } = await supabase
     .from("salaries")
     .update(payload)
@@ -97,8 +98,8 @@ export async function sortirSalarie(id, sortieForm) {
 /**
  * Vérifie que le numéro de sécurité sociale est unique (toutes filiales confondues).
  * Retourne les doublons trouvés (tableau vide = unique).
- * @param {string} numSecu
- * @param {string|null} excludeId - ID du salarié à exclure (pour les modifications)
+ * Chaque doublon contient : id, nom, prenom, is_candidat, site_id, date_entree, date_sortie
+ * → date_sortie IS NULL = personne encore active ; IS NOT NULL = ancienne fiche
  */
 // Vérifie qu'un string est un UUID valide (format Supabase)
 const isUUID = (s) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
@@ -107,13 +108,26 @@ export async function checkNumSecuUnique(numSecu, excludeId = null) {
   if (!numSecu || !numSecu.trim()) return [];
   let q = supabase
     .from("salaries")
-    .select("id, nom, prenom, is_candidat, site_id")
+    .select("id, nom, prenom, is_candidat, site_id, date_entree, date_sortie")
     .eq("num_secu_sociale", numSecu.trim());
-  // N'exclure que si c'est un vrai UUID (pas un ID mock local type "sal123...")
   if (excludeId && isUUID(excludeId)) q = q.neq("id", excludeId);
   const { data, error } = await q;
   if (error) throw error;
   return data ?? [];
+}
+
+/**
+ * Récupère une fiche complète par son ID (pour pré-remplissage lors de la récupération).
+ */
+export async function getSalarieById(id) {
+  if (!id || !isUUID(id)) return null;
+  const { data, error } = await supabase
+    .from("salaries")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error) throw error;
+  return mapSalarieFromDB(data);
 }
 
 /**

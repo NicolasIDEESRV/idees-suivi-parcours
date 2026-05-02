@@ -6,16 +6,16 @@ import { FInput, FSelect, FTextarea } from "./ui";
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const IMPRESSIONS = [
-  { v: "tres_bien", l: "Très bien — motivation claire, projet cohérent",   bg: "bg-green-100 text-green-800 border-green-300",   dot: "bg-green-500"  },
-  { v: "bien",      l: "Bien — bon profil, quelques points à consolider",  bg: "bg-blue-100  text-blue-800  border-blue-300",    dot: "bg-blue-500"   },
-  { v: "doute",     l: "Doute — réserve(s) identifiée(s)",                 bg: "bg-orange-100 text-orange-800 border-orange-300", dot: "bg-orange-400" },
-  { v: "decliner",  l: "À décliner — candidature non retenue",             bg: "bg-red-100   text-red-800   border-red-300",     dot: "bg-red-500"    },
+  { v: "tres_bien", l: "Très bien",  sub: "Motivation claire, projet cohérent",      bg: "bg-green-100  text-green-800",  border: "border-green-400",  dot: "bg-green-500"  },
+  { v: "bien",      l: "Bien",       sub: "Bon profil, quelques points à consolider", bg: "bg-blue-100   text-blue-800",   border: "border-blue-400",   dot: "bg-blue-500"   },
+  { v: "doute",     l: "Doute",      sub: "Réserve(s) identifiée(s) — à préciser",    bg: "bg-orange-100 text-orange-800", border: "border-orange-400", dot: "bg-orange-400" },
+  { v: "decliner",  l: "À décliner", sub: "Candidature non retenue",                  bg: "bg-red-100    text-red-800",    border: "border-red-400",    dot: "bg-red-500"    },
 ];
 const ORIENTATIONS = [
-  { v: "evaluation", l: "Évaluation en cours", bg: "bg-orange-100 text-orange-800 border-orange-300", dot: "bg-orange-400" },
-  { v: "recrute",    l: "Recruter",            bg: "bg-green-100 text-green-800 border-green-300",   dot: "bg-green-500"  },
-  { v: "vivier",     l: "Vivier",              bg: "bg-blue-100  text-blue-800  border-blue-300",    dot: "bg-blue-500"   },
-  { v: "decliner",   l: "Décliner",            bg: "bg-red-100   text-red-800   border-red-300",     dot: "bg-red-500"    },
+  { v: "evaluation", l: "Évaluation en cours", sub: "",                                        bg: "bg-orange-100 text-orange-800", border: "border-orange-400", dot: "bg-orange-400" },
+  { v: "recrute",    l: "Recruter",            sub: "Intégration en CDDI",                      bg: "bg-green-100  text-green-800",  border: "border-green-400",  dot: "bg-green-500"  },
+  { v: "vivier",     l: "Vivier",              sub: "À rappeler lors d'une prochaine ouverture", bg: "bg-blue-100   text-blue-800",   border: "border-blue-400",   dot: "bg-blue-500"   },
+  { v: "decliner",   l: "Décliner",            sub: "Motif à préciser ci-dessous",               bg: "bg-red-100    text-red-800",    border: "border-red-400",    dot: "bg-red-500"    },
 ];
 const RECHERCHE_OPTIONS = ["Moins de 6 mois","6 à 12 mois","1 à 2 ans","2 à 5 ans","Plus de 5 ans"];
 const PIECE_OPTIONS = [
@@ -26,24 +26,6 @@ const PIECE_OPTIONS = [
 const STEPS = ["Entretien", "Identification", "Aptitude & Poste", "Projet & Motivation", "Freins", "Présentation EI", "Conclusion"];
 
 // ─── Composants UI locaux ─────────────────────────────────────────────────────
-function RadioChips({ options, value, onChange }) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map(o => (
-        <button key={o.v} type="button" onClick={() => onChange(o.v)}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-sm font-medium transition-all ${
-            value === o.v
-              ? o.bg + " shadow-sm ring-1 ring-inset ring-current/30"
-              : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-          }`}>
-          <span className={`w-2 h-2 rounded-full ${value === o.v ? o.dot : "bg-gray-300"}`} />
-          {o.l}
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function TroisBoutons({ options, value, onChange }) {
   return (
     <div className="flex gap-2 flex-wrap">
@@ -73,6 +55,29 @@ function StepLabel({ icon, title, subtitle }) {
 
 function SectionTitle({ children }) {
   return <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1 mb-2">{children}</p>;
+}
+
+// ─── Cartes impression / orientation ─────────────────────────────────────────
+function DecisionCards({ options, value, onChange }) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {options.map(o => (
+        <button key={o.v} type="button"
+          onClick={() => onChange(value === o.v ? "" : o.v)}
+          className={`flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+            value === o.v
+              ? `${o.bg} ${o.border} shadow-sm`
+              : "bg-white border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+          }`}>
+          <span className={`w-2.5 h-2.5 rounded-full shrink-0 mt-1 ${value === o.v ? o.dot : "bg-gray-300"}`} />
+          <div>
+            <p className="text-sm font-semibold leading-tight">{o.l}</p>
+            <p className="text-xs opacity-70 mt-0.5 leading-snug">{o.sub}</p>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
 }
 
 // ─── Sélecteur multi-utilisateurs ─────────────────────────────────────────────
@@ -173,11 +178,25 @@ export default function FormulaireEntretienCandidat({
   const [saving,     setSaving]     = useState(false);
   const [err,        setErr]        = useState("");
 
+  // ── Dériver l'état "contrainte signalée" depuis la valeur enregistrée ────────
+  const initContrainteSignalee = salarie.contraintePhysique ? "oui" : "";
+
+  // ── Dériver horaireCapable / horaireMotif depuis contrainteHoraire ──────────
+  const initHoraireCapable = salarie.contrainteHoraire === "Aucune contrainte"
+    ? "oui"
+    : salarie.contrainteHoraire ? "reserve" : "";
+  const initHoraireMotif = salarie.contrainteHoraire === "Aucune contrainte"
+    ? ""
+    : salarie.contrainteHoraire || "";
+
+  // ── Pré-remplir avecQui avec le CIP référent si connu ───────────────────────
+  const initAvecQui = salarie.cip_id ? [salarie.cip_id] : [];
+
   const [form, setForm] = useState({
     // ── 0. Info entretien
     date:         todayStr,
     assignedTo:   salarie.cip_id || (users[0]?.id ?? ""),
-    avecQui:      [],
+    avecQui:      initAvecQui,
     ou:           "",
 
     // ── 1. Identification
@@ -186,23 +205,22 @@ export default function FormulaireEntretienCandidat({
     enRecherchDepuis:    salarie.enRecherchDepuis    || "",
     pieceIdentite:       salarie.pieceIdentite       || "",
     titreSejourValidite: salarie.titreSejourValidite || "",
-    documentScanne:      "",   // "oui" | "non"
+    documentScanne:      "",
 
     // ── 2. Aptitude & Poste
-    niveauLangue:          salarie.niveauLangue       || "",
-    contraintePhysique:    salarie.contraintePhysique || "",   // observations aptitude
-    contrainteSignalee:    "",   // "aucune" | "oui"
-    visiteDuPoste:         "",   // retenu / apprécié ou non
-    connaitSalarie:        null, // null | true | false
-    connaitSalarieLequel:  "",
-    // Horaires
-    horaireCapable:  "",         // "oui" | "reserve" | "non"
-    horaireMotif:    "",
+    niveauLangue:         salarie.niveauLangue       || "",
+    contraintePhysique:   salarie.contraintePhysique || "",
+    contrainteSignalee:   initContrainteSignalee,
+    visiteDuPoste:        "",
+    connaitSalarie:       null,
+    connaitSalarieLequel: "",
+    horaireCapable:       initHoraireCapable,
+    horaireMotif:         initHoraireMotif,
 
     // ── 3. Projet & Motivation
     projetPro:            salarie.projetPro || "",
-    accompagnementEnCours: "",   // sur quoi travaille-t-il dans son accompagnement ?
-    parcoursResume:       "",    // résumé du parcours
+    accompagnementEnCours: "",
+    parcoursResume:       "",
 
     // ── 4. Freins
     freinsEntree: { ...(salarie.freinsEntree || {}) },
@@ -221,7 +239,13 @@ export default function FormulaireEntretienCandidat({
   });
 
   const upd = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const canNext = step === 0 ? (form.date && form.avecQui.length > 0) : true;
+
+  // ── Validation par étape ───────────────────────────────────────────────────
+  const canNext = (() => {
+    if (step === 0) return !!(form.date && form.avecQui.length > 0);
+    if (step === 5) return form.presentationFaite && !!form.adhesionEI;
+    return true;
+  })();
 
   // ── Enregistrement ────────────────────────────────────────────────────────
   const handleSave = async () => {
@@ -233,10 +257,10 @@ export default function FormulaireEntretienCandidat({
         .map(id => { const u = users.find(x => x.id === id); return u ? `${u.prenom} ${u.nom}` : id; })
         .join(", ");
 
-      const typeLabel = typeChoice === "tel" ? "Entretien téléphonique" : "Entretien physique";
+      const modeLabel = typeChoice === "tel" ? "Entretien téléphonique" : "Entretien physique";
 
-      // Construction du compte-rendu structuré dans "sujets"
       const lignes = [];
+      lignes.push(modeLabel);
       if (typeChoice === "phys" && form.ou)         lignes.push(`Lieu : ${form.ou}`);
       if (form.visiteDuPoste)                       lignes.push(`Visite du poste : ${form.visiteDuPoste}`);
       if (form.connaitSalarie !== null)             lignes.push(`Connaît un salarié : ${form.connaitSalarie ? `Oui — ${form.connaitSalarieLequel}` : "Non"}`);
@@ -250,7 +274,7 @@ export default function FormulaireEntretienCandidat({
         cip_id:       form.assignedTo,
         assignedTo:   form.assignedTo,
         date:         form.date,
-        type:         typeLabel,
+        type:         "Accueil",
         sujets:       lignes.join(" · "),
         synthese:     form.commentaireFinal,
         participants: participantNames,
@@ -258,7 +282,6 @@ export default function FormulaireEntretienCandidat({
         objectifs:    [],
       });
 
-      // Mise à jour des champs candidat
       await onSaveCandidat({
         prescripteur:        form.prescripteur        || salarie.prescripteur,
         autreAccompagnateur: form.autreAccompagnateur || salarie.autreAccompagnateur,
@@ -412,7 +435,7 @@ export default function FormulaireEntretienCandidat({
                 {RECHERCHE_OPTIONS.map(o => <option key={o}>{o}</option>)}
               </FSelect>
 
-              {/* Pièce d'identité ⚠ vérification obligatoire */}
+              {/* Pièce d'identité */}
               <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 space-y-3">
                 <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">
                   ⚠ Pièce d'identité — vérification obligatoire
@@ -434,24 +457,38 @@ export default function FormulaireEntretienCandidat({
                 {form.pieceIdentite === "titre" && (
                   <div className="space-y-3">
                     <p className="text-xs text-amber-700 italic">
-                      Vérifier que la date de validité couvre au moins la durée du contrat proposé. Scanner le document.
+                      Vérifier que la date de validité couvre au moins la durée du contrat proposé.
                     </p>
                     <FInput label="Date de validité du titre de séjour"
                       type="date" value={form.titreSejourValidite}
                       onChange={e => upd("titreSejourValidite", e.target.value)} />
-                    <div>
-                      <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">Document scanné ?</label>
-                      <div className="flex gap-2">
-                        {[{v:"oui",l:"✓ Oui"},{v:"non",l:"✗ Non"}].map(o => (
-                          <button key={o.v} type="button" onClick={() => upd("documentScanne", o.v)}
-                            className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
-                              form.documentScanne === o.v
-                                ? (o.v === "oui" ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300")
-                                : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-                            }`}>{o.l}</button>
-                        ))}
+
+                    {/* Document scanné — conditionnel selon type d'entretien */}
+                    {typeChoice === "tel" ? (
+                      <div className="flex items-start gap-3 p-3 bg-orange-50 rounded-xl border border-orange-200">
+                        <span className="text-lg shrink-0">📞</span>
+                        <div>
+                          <p className="text-xs font-semibold text-orange-800">Scan impossible par téléphone</p>
+                          <p className="text-xs text-orange-700 mt-0.5">
+                            Document à vérifier et scanner lors de l'entretien physique.
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div>
+                        <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">Document scanné ?</label>
+                        <div className="flex gap-2">
+                          {[{v:"oui",l:"✓ Oui"},{v:"non",l:"✗ Non"}].map(o => (
+                            <button key={o.v} type="button" onClick={() => upd("documentScanne", o.v)}
+                              className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                                form.documentScanne === o.v
+                                  ? (o.v === "oui" ? "bg-green-100 text-green-800 border-green-300" : "bg-red-100 text-red-800 border-red-300")
+                                  : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                              }`}>{o.l}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
@@ -461,11 +498,11 @@ export default function FormulaireEntretienCandidat({
           {/* ══ 2 — Aptitude & Poste ══ */}
           {step === 2 && (
             <div className="space-y-5">
-              <StepLabel icon="💪" title="Aptitude & Poste" subtitle="Langue, aptitude physique, visite du poste, horaires" />
+              <StepLabel icon="💪" title="Aptitude & Poste" subtitle="Langue, aptitude, horaires" />
 
               {/* Niveau de français */}
               <div>
-                <SectionTitle>3. Niveau de français</SectionTitle>
+                <SectionTitle>Niveau de français</SectionTitle>
                 <p className="text-xs text-gray-400 mb-2">Niveau minimum requis : A2. Niveau recommandé : B1.</p>
                 <FSelect label="Niveau évalué" value={form.niveauLangue} onChange={e => upd("niveauLangue", e.target.value)}>
                   <option value="">—</option>
@@ -473,11 +510,11 @@ export default function FormulaireEntretienCandidat({
                 </FSelect>
               </div>
 
-              {/* Aptitude physique */}
+              {/* Aptitude physique — générique, applicable à tous les sites */}
               <div className="p-4 bg-gray-50 rounded-xl border border-gray-200 space-y-3">
-                <SectionTitle>4. Aptitude physique au poste</SectionTitle>
-                <p className="text-xs text-gray-400 italic">
-                  Le poste implique : station debout prolongée, posture statique, gestes répétitifs. Vérifier l'absence de contre-indication médicale connue.
+                <SectionTitle>Aptitude physique</SectionTitle>
+                <p className="text-xs text-gray-500 italic">
+                  Vérifier l'absence de contre-indication médicale connue au poste.
                 </p>
                 <div>
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">
@@ -495,73 +532,65 @@ export default function FormulaireEntretienCandidat({
                 {form.contrainteSignalee === "oui" && (
                   <FTextarea label="Précision / observations" value={form.contraintePhysique}
                     onChange={e => upd("contraintePhysique", e.target.value)}
-                    rows={2} placeholder="Nature de la contrainte, posture, mobilité perçue…" />
+                    rows={2} placeholder="Nature de la contrainte, mobilité, observations…" />
                 )}
                 {form.contrainteSignalee === "aucune" && (
-                  <FTextarea label="Observations (posture, mobilité perçue lors de l'entretien)"
+                  <FTextarea label="Observations (facultatif)"
                     value={form.contraintePhysique}
                     onChange={e => upd("contraintePhysique", e.target.value)}
-                    rows={2} placeholder="Facultatif — impressions générales sur la mobilité…" />
+                    rows={2} placeholder="Impressions générales sur la mobilité perçue…" />
                 )}
               </div>
 
-              {/* Retour visite du poste */}
-              <div className="space-y-3">
-                <SectionTitle>5. Retour sur la visite du poste</SectionTitle>
-                <FTextarea label="Ce que le candidat a retenu / apprécié ou non"
-                  value={form.visiteDuPoste}
-                  onChange={e => upd("visiteDuPoste", e.target.value)}
-                  rows={2} placeholder="Réactions du candidat pendant la visite…" />
-                <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">
-                    Connaît ou a connu un salarié de la structure ?
-                  </label>
-                  <div className="flex gap-2">
-                    {[{v:true,l:"✓ Oui"},{v:false,l:"Non"}].map(o => (
-                      <button key={String(o.v)} type="button"
-                        onClick={() => upd("connaitSalarie", form.connaitSalarie === o.v ? null : o.v)}
-                        className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
-                          form.connaitSalarie === o.v
-                            ? (o.v ? "bg-indigo-100 text-indigo-800 border-indigo-300" : "bg-gray-100 text-gray-700 border-gray-300")
-                            : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
-                        }`}>{o.l}</button>
-                    ))}
-                  </div>
-                  {form.connaitSalarie === true && (
-                    <div className="mt-2">
-                      <FInput label="Lequel ?" value={form.connaitSalarieLequel}
-                        onChange={e => upd("connaitSalarieLequel", e.target.value)} placeholder="Nom du salarié…" />
-                    </div>
-                  )}
+              {/* Visite du poste — entretien physique uniquement */}
+              {typeChoice === "phys" && (
+                <div className="space-y-3">
+                  <SectionTitle>Si visite du poste — retour du candidat</SectionTitle>
+                  <FTextarea label="Impressions / réactions du candidat"
+                    value={form.visiteDuPoste}
+                    onChange={e => upd("visiteDuPoste", e.target.value)}
+                    rows={2} placeholder="Ce que le candidat a apprécié ou non, questions posées, réactions…" />
                 </div>
+              )}
+
+              {/* Connaît un salarié — applicable dans tous les cas */}
+              <div>
+                <SectionTitle>Connaît ou a connu un salarié de la structure ?</SectionTitle>
+                <div className="flex gap-2">
+                  {[{v:true,l:"✓ Oui"},{v:false,l:"Non"}].map(o => (
+                    <button key={String(o.v)} type="button"
+                      onClick={() => upd("connaitSalarie", form.connaitSalarie === o.v ? null : o.v)}
+                      className={`px-4 py-2 rounded-xl border text-sm font-medium transition-all ${
+                        form.connaitSalarie === o.v
+                          ? (o.v ? "bg-indigo-100 text-indigo-800 border-indigo-300" : "bg-gray-100 text-gray-700 border-gray-300")
+                          : "bg-white text-gray-500 border-gray-200 hover:border-gray-300"
+                      }`}>{o.l}</button>
+                  ))}
+                </div>
+                {form.connaitSalarie === true && (
+                  <div className="mt-2">
+                    <FInput label="Lequel ?" value={form.connaitSalarieLequel}
+                      onChange={e => upd("connaitSalarieLequel", e.target.value)} placeholder="Nom du salarié…" />
+                  </div>
+                )}
               </div>
 
-              {/* Horaires */}
+              {/* Horaires — générique, applicable à tous les sites */}
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-200 space-y-3">
-                <SectionTitle>10. Présentation des horaires</SectionTitle>
-                <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="bg-white rounded-xl border border-blue-200 p-3">
-                    <p className="font-bold text-blue-800 mb-1">🌅 Poste matin</p>
-                    <p className="text-blue-700 font-semibold">6h00 – 13h30</p>
-                    <p className="text-gray-500 mt-1">Semaine A : Lundi → Vendredi</p>
-                    <p className="text-gray-500">Semaine B : Mardi → Samedi</p>
-                  </div>
-                  <div className="bg-white rounded-xl border border-blue-200 p-3">
-                    <p className="font-bold text-blue-800 mb-1">🌆 Poste après-midi</p>
-                    <p className="text-blue-700 font-semibold">13h30 – 21h00</p>
-                    <p className="text-gray-500 mt-1">Alternance avec poste matin</p>
-                    <p className="text-gray-500">Planning communiqué à l'avance</p>
-                  </div>
-                </div>
+                <SectionTitle>Présentation des horaires du poste</SectionTitle>
+                <p className="text-xs text-blue-700 leading-relaxed">
+                  Présenter les horaires spécifiques au poste (horaires décalés, travail en équipe, week-ends éventuels)
+                  et vérifier la disponibilité et l'accord du candidat.
+                </p>
                 <div>
                   <label className="text-xs font-semibold text-gray-600 uppercase tracking-wide block mb-2">
-                    Le candidat peut-il tenir ces horaires ?
+                    Le candidat est-il disponible et en accord avec ces horaires ?
                   </label>
                   <TroisBoutons
                     options={[
                       { v: "oui",     l: "✓ Oui, sans contrainte",  bg: "bg-green-100 text-green-800 border-green-300"   },
                       { v: "reserve", l: "◐ Oui, avec réserve",     bg: "bg-orange-100 text-orange-800 border-orange-300" },
-                      { v: "non",     l: "✗ Non",                   bg: "bg-red-100 text-red-800 border-red-300"          },
+                      { v: "non",     l: "✗ Non compatible",         bg: "bg-red-100 text-red-800 border-red-300"          },
                     ]}
                     value={form.horaireCapable}
                     onChange={v => upd("horaireCapable", v)}
@@ -582,7 +611,7 @@ export default function FormulaireEntretienCandidat({
             <div className="space-y-5">
               <StepLabel icon="🎯" title="Projet & Motivation" subtitle="Projet professionnel, parcours et questions de motivation" />
 
-              <SectionTitle>6. Projet professionnel & accompagnement</SectionTitle>
+              <SectionTitle>Projet professionnel &amp; accompagnement</SectionTitle>
               <div className="grid grid-cols-2 gap-4">
                 <FInput label="Projet professionnel (court / moyen terme)"
                   value={form.projetPro}
@@ -595,13 +624,12 @@ export default function FormulaireEntretienCandidat({
               </div>
 
               <div>
-                <SectionTitle>7. Parcours & Motivation</SectionTitle>
+                <SectionTitle>Parcours &amp; Motivation</SectionTitle>
                 <FTextarea label="Parcours résumé (expériences, situation actuelle)"
                   value={form.parcoursResume}
                   onChange={e => upd("parcoursResume", e.target.value)}
                   rows={3} placeholder="Historique professionnel, contexte personnel pertinent…" />
               </div>
-
             </div>
           )}
 
@@ -637,7 +665,7 @@ export default function FormulaireEntretienCandidat({
           {step === 5 && (
             <div className="space-y-5">
               <StepLabel icon="🏭" title="Présentation de l'entreprise d'insertion"
-                subtitle="Points clés à aborder — vérifier l'adhésion du candidat" />
+                subtitle="Étape obligatoire — à réaliser avant de conclure l'entretien" />
 
               <div className="space-y-3">
                 {[
@@ -660,17 +688,29 @@ export default function FormulaireEntretienCandidat({
                 ))}
               </div>
 
-              <label className="flex items-center gap-3 cursor-pointer p-3.5 bg-green-50 rounded-xl border border-green-200 hover:bg-green-100 transition-colors">
+              {/* Case obligatoire */}
+              <label className={`flex items-center gap-3 cursor-pointer p-3.5 rounded-xl border-2 transition-colors ${
+                form.presentationFaite
+                  ? "bg-green-50 border-green-300 hover:bg-green-100"
+                  : "bg-red-50 border-red-200 hover:bg-red-100"
+              }`}>
                 <input type="checkbox" checked={form.presentationFaite}
                   onChange={e => upd("presentationFaite", e.target.checked)}
                   className="w-4 h-4 rounded accent-green-600 cursor-pointer" />
-                <p className="text-sm font-semibold text-green-800">Présentation effectuée</p>
+                <div>
+                  <p className={`text-sm font-semibold ${form.presentationFaite ? "text-green-800" : "text-red-700"}`}>
+                    Présentation effectuée <span className="text-red-400">*</span>
+                  </p>
+                  {!form.presentationFaite && (
+                    <p className="text-xs text-red-500 mt-0.5">Obligatoire avant de passer à la conclusion</p>
+                  )}
+                </div>
               </label>
 
               {form.presentationFaite && (
                 <div className="space-y-3">
                   <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block">
-                    Le candidat a compris et adhère ?
+                    Le candidat a compris et adhère ? <span className="text-red-400">*</span>
                   </label>
                   {[
                     { v: "oui",     l: "✓ Oui, clairement",                    bg: "bg-green-50 border-green-300 text-green-800"   },
@@ -692,10 +732,12 @@ export default function FormulaireEntretienCandidat({
                 </div>
               )}
 
-              {/* Info suite candidat */}
-              <div className="p-3.5 bg-gray-50 rounded-xl border border-gray-200 text-xs text-gray-500 italic">
-                ℹ️ Le candidat devra rappeler ID'EES Intérim pour être informé de la suite donnée à sa candidature.
-              </div>
+              {!form.presentationFaite && (
+                <p className="text-xs text-red-500 bg-red-50 rounded-xl px-4 py-3">
+                  ⛔ La présentation de l'EI doit être effectuée avant de passer à la conclusion.
+                </p>
+              )}
+
             </div>
           )}
 
@@ -709,24 +751,60 @@ export default function FormulaireEntretienCandidat({
                 onChange={e => upd("commentaireFinal", e.target.value)}
                 rows={2} placeholder="Points saillants de l'entretien, précisions sur l'orientation…" />
 
+              {/* Impression globale — cartes 2×2 */}
               <div>
                 <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
                   Impression globale
                 </label>
-                <RadioChips options={IMPRESSIONS} value={form.impression} onChange={v => upd("impression", v)} />
+                <DecisionCards
+                  options={IMPRESSIONS}
+                  value={form.impression}
+                  onChange={v => {
+                    const newImpression = form.impression === v ? "" : v;
+                    setForm(f => ({
+                      ...f,
+                      impression: newImpression,
+                      // Auto-sélectionner "Décliner" si impression "À décliner", réinitialiser sinon si incohérent
+                      orientation: newImpression === "decliner"
+                        ? "decliner"
+                        : (f.orientation === "decliner" ? "" : f.orientation),
+                    }));
+                  }}
+                />
               </div>
 
-              <div>
-                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
-                  Orientation
-                </label>
-                <RadioChips options={ORIENTATIONS} value={form.orientation} onChange={v => upd("orientation", v)} />
-              </div>
+              {/* Orientation — cartes 2×2 */}
+              {form.impression && (
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-2">
+                    Orientation
+                  </label>
+                  {form.impression === "decliner" ? (
+                    <div className="flex items-center gap-3 p-3.5 rounded-xl border-2 bg-red-100 text-red-800 border-red-400">
+                      <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                      <div>
+                        <p className="text-sm font-semibold leading-tight">Décliner</p>
+                        <p className="text-xs opacity-70 mt-0.5 leading-snug">Motif à préciser ci-dessous</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <DecisionCards
+                      options={
+                        (form.impression === "tres_bien" || form.impression === "bien")
+                          ? ORIENTATIONS.filter(o => o.v !== "decliner")
+                          : ORIENTATIONS
+                      }
+                      value={form.orientation}
+                      onChange={v => upd("orientation", v)}
+                    />
+                  )}
+                </div>
+              )}
 
-              {form.orientation && form.orientation !== "recrute" && (
+              {((form.orientation && form.orientation !== "recrute") || form.impression === "decliner") && (
                 <FInput
                   label={
-                    form.orientation === "decliner"   ? "Motif de déclin" :
+                    (form.orientation === "decliner" || form.impression === "decliner") ? "Motif de déclin" :
                     form.orientation === "vivier"     ? "Note vivier"     :
                     form.orientation === "evaluation" ? "Étape / précision (facultatif)" : "Précision"
                   }
@@ -761,7 +839,7 @@ export default function FormulaireEntretienCandidat({
           <div className="flex gap-2">
             {step < STEPS.length - 1 ? (
               <>
-                {step > 0 && (
+                {step > 0 && step < STEPS.length - 2 && (
                   <button type="button" onClick={() => setStep(STEPS.length - 1)}
                     className="px-4 py-2 rounded-xl text-sm text-gray-400 hover:text-gray-600 hover:bg-gray-50 border border-gray-200">
                     Passer à la conclusion →→

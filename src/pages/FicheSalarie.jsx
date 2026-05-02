@@ -107,12 +107,19 @@ function CompletionBar({ salarie, onEdit }) {
 }
 
 export default function FicheSalarie({ salarie, entretiens, user, users, sites = [], setPage, onEdit, onAddEntretien, onOpenSortie, onDelete, onSaveCandidat, onConvertToSalarie }) {
-  const [tab,         setTab]         = useState("apercu");
-  const [showE,       setShowE]       = useState(false);
-  const [showCandE,   setShowCandE]   = useState(false);
-  const [showDecliner, setShowDecliner] = useState(false);
+  const [tab,              setTab]              = useState("apercu");
+  const [showE,            setShowE]            = useState(false);
+  const [showCandE,        setShowCandE]        = useState(false);
+  const [showDecliner,     setShowDecliner]     = useState(false);
+  const [showSortieWarning, setShowSortieWarning] = useState(false);
 
   const mesE    = entretiens.filter(e => e.salarie_id === salarie.id).sort((a, b) => new Date(b.date) - new Date(a.date));
+  // Entretiens d'un passage précédent (via previousSalarieId)
+  const prevE   = salarie.previousSalarieId
+    ? entretiens.filter(e => e.salarie_id === salarie.previousSalarieId).sort((a, b) => new Date(b.date) - new Date(a.date))
+    : [];
+  // Bilan de sortie : y a-t-il un entretien de type "Bilan de sortie" ?
+  const bilanDeSortieExiste = mesE.some(e => e.type === "Bilan de sortie");
   const tousObj = mesE.flatMap(e => e.objectifs || []).filter(o => o.intitule);
   const objEnCours = tousObj.filter(o => o.atteint === null || o.atteint === undefined);
   const pct = Math.min(100, Math.round(dureeM(salarie.dateEntree, salarie.dateSortie) / 24 * 100));
@@ -122,11 +129,48 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
     { id: "entretiens", l: `Entretiens (${mesE.length})` },
     { id: "objectifs",  l: `Objectifs (${tousObj.length})` },
     { id: "freins",     l: "Freins" },
+    ...(prevE.length > 0 ? [{ id: "historique", l: `Historique (${prevE.length})` }] : []),
     { id: "admin",      l: "Admin" },
   ];
 
   return (
     <div className="flex flex-col min-h-full">
+
+      {/* ── Modale : bilan de sortie manquant ─────────────────────────────── */}
+      {showSortieWarning && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.5)", zIndex:150, display:"flex", alignItems:"center", justifyContent:"center", padding:"2rem" }}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+            <div className="flex items-start gap-3">
+              <span className="text-3xl">⚠️</span>
+              <div>
+                <h3 className="font-bold text-gray-900">Bilan de sortie manquant</h3>
+                <p className="text-sm text-gray-500 mt-0.5">Le bilan de sortie doit être complété avant de pouvoir sortir ce salarié.</p>
+              </div>
+            </div>
+            <div className="bg-orange-50 border border-orange-200 rounded-xl p-4 text-sm text-orange-800 space-y-1">
+              <p>Pour compléter le bilan de sortie :</p>
+              <ol className="list-decimal list-inside space-y-1 text-xs mt-2">
+                <li>Cliquez <strong>Annuler</strong> pour fermer cette fenêtre</li>
+                <li>Créez un entretien de type <strong>«&nbsp;Bilan de sortie&nbsp;»</strong> via le bouton <em>+ Entretien</em></li>
+                <li>Une fois le bilan enregistré, relancez la sortie</li>
+              </ol>
+            </div>
+            <p className="text-xs text-gray-400">Si vous souhaitez tout de même procéder sans bilan, vous pouvez continuer.</p>
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setShowSortieWarning(false)}
+                className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+                Annuler
+              </button>
+              <button
+                onClick={() => { setShowSortieWarning(false); onOpenSortie(salarie); }}
+                className="flex-1 px-4 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold">
+                Sortir sans bilan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showE && (
         <EntretienForm
           salarie={salarie}
@@ -212,7 +256,14 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
               </button>
             )}
             {!salarie.isCandidat && !salarie.dateSortie && (
-              <button onClick={() => onOpenSortie(salarie)} className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl">Sortir</button>
+              <button
+                onClick={() => {
+                  if (!bilanDeSortieExiste) { setShowSortieWarning(true); return; }
+                  onOpenSortie(salarie);
+                }}
+                className="text-sm bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 px-3 py-2 rounded-xl">
+                Sortir
+              </button>
             )}
             {user.role === "admin" && (
               <button
@@ -424,6 +475,55 @@ export default function FicheSalarie({ salarie, entretiens, user, users, sites =
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Historique passages précédents */}
+      {tab === "historique" && prevE.length > 0 && (
+        <div className="bg-white rounded-2xl border border-gray-200 p-5">
+          <div className="mb-5">
+            <h2 className="font-semibold text-gray-800">Historique des passages précédents</h2>
+            <p className="text-xs text-gray-400 mt-1">
+              Entretiens et objectifs issus de l'ancien dossier — lecture seule.
+            </p>
+          </div>
+          <div className="relative">
+            <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-amber-100" />
+            <div className="space-y-3">
+              {prevE.map((e, i) => {
+                const resp = users.find(u => u.id === e.assignedTo);
+                return (
+                  <div key={e.id} className="flex gap-4">
+                    <div className="w-8 h-8 rounded-full bg-amber-200 text-amber-800 flex items-center justify-center shrink-0 z-10 text-xs font-bold">
+                      {prevE.length - i}
+                    </div>
+                    <div className="flex-1 rounded-xl border border-amber-100 bg-amber-50 p-3">
+                      <div className="flex justify-between mb-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-gray-700">{e.type}</span>
+                          {e.jalon && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Jalon</span>}
+                          {resp && <span className="text-xs text-gray-400">· {resp.prenom} {resp.nom}</span>}
+                        </div>
+                        <span className="text-xs text-gray-400">{fmt(e.date)}</span>
+                      </div>
+                      {e.sujets   && <p className="text-xs text-gray-600 mb-1"><strong>Sujets :</strong> {e.sujets}</p>}
+                      {e.synthese && <p className="text-xs text-gray-600"><strong>Synthèse :</strong> {e.synthese}</p>}
+                      {(e.objectifs || []).length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          {e.objectifs.map(o => (
+                            <div key={o.id} className={`flex items-center justify-between text-xs px-2 py-1 rounded-lg ${o.atteint === true ? "bg-green-100 text-green-700" : o.atteint === false ? "bg-red-100 text-red-700" : "bg-white border border-gray-200 text-gray-600"}`}>
+                              <span>🎯 {o.intitule}</span>
+                              <span>{o.atteint === true ? "✓ Atteint" : o.atteint === false ? "✗ Non atteint" : fmt(o.deadline)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
         </div>
       )}
 

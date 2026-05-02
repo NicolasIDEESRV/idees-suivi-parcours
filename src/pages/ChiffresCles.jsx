@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import ExcelJS from "exceljs";
 import { getHeuresMensuelles, upsertHeuresMensuelles } from "../lib/api/heures";
 import { PRESCRIPTEURS } from "../lib/constants";
+import { SiteOptions } from "../components/ui";
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 
@@ -954,7 +955,7 @@ function SyntheseTab({ salaries, sites, user }) {
           <select value={fSiteId} onChange={e => setFSiteId(e.target.value)}
             className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-200">
             <option value="all">Tous les sites</option>
-            {userSites.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+            <SiteOptions sites={userSites} />
           </select>
         )}
         {/* Export */}

@@ -176,9 +176,84 @@ export const mapSalarieFromDB = (row) => ({
   titreSejourValidite: row.titre_sejour_validite  ?? "",
   contraintePhysique:  row.contrainte_physique    ?? "",
   contrainteHoraire:   row.contrainte_horaire     ?? "",
+  messageCandidature:  row.message_candidature    ?? "",
   // Sécurité sociale
   numSecuSociale:      row.num_secu_sociale       ?? "",
+  // Lien vers un passage précédent (récupération de données)
+  previousSalarieId:   row.previous_salarie_id    ?? null,
 });
+
+/**
+ * Candidat JS → payload DB.
+ *
+ * Colonnes date contrat (date_entree, date_fin_contrat, date_fin_agrement) :
+ *   - Idéalement NULL (candidat pas encore embauché).
+ *   - Mais si la DB a encore une contrainte NOT NULL sans DEFAULT, on envoie
+ *     la date du jour comme valeur sentinelle neutre — elle sera écrasée lors
+ *     de la conversion candidat → salarié.
+ *
+ * Migration recommandée (Supabase SQL Editor) :
+ *   ALTER TABLE salaries ALTER COLUMN date_entree      DROP NOT NULL;
+ *   ALTER TABLE salaries ALTER COLUMN date_fin_contrat  DROP NOT NULL;
+ *   ALTER TABLE salaries ALTER COLUMN date_fin_agrement DROP NOT NULL;
+ */
+const _today = () => new Date().toISOString().split("T")[0];
+
+export const mapCandidatToDB = (obj) => {
+  const today = _today();
+  return {
+    site_id: obj.site_id,
+    cip_id:  obj.cip_id,
+
+    // État civil
+    nom:            obj.nom,
+    prenom:         obj.prenom,
+    date_naissance: obj.dateNaissance || null,
+    sexe:           obj.sexe          || null,
+    telephone:      obj.telephone     || null,
+    mail:           obj.mail          || null,
+
+    // Dates contrat — NULL pour les candidats (contrainte NOT NULL supprimée en migration)
+    // On conserve les dates si elles existent (cas embauche / mise à jour post-migration)
+    date_entree:       obj.dateEntree      || null,
+    date_fin_contrat:  obj.dateFinContrat  || null,
+    date_fin_agrement: obj.dateFinAgrement || null,
+
+    // Prescripteur / accompagnement
+    prescripteur:            obj.prescripteur          || "FRANCE TRAVAIL",
+    nom_prenom_prescripteur: obj.nomPrenomPrescripteur || null,
+    statut_accueil:          obj.statutAccueil         || "Inscrit",
+
+    // Publics prioritaires
+    deld:            obj.deld            ?? false,
+    brsa:            obj.brsa            ?? false,
+    th:              obj.th              ?? false,
+    rqth:            obj.rqth            ?? false,
+    ass:             obj.ass             ?? false,
+    sans_ressources: obj.sansRessources  ?? false,
+    resident_qpv:    obj.residentQPV     ?? false,
+
+    // Champs JSON — conserver les valeurs existantes (ne pas écraser avec {})
+    freins_entree: obj.freinsEntree ?? {},
+    freins_sortie: obj.freinsSortie ?? {},
+    badges:        obj.badges       ?? {},
+    domaines_pro:  obj.domainesPro  ?? [],
+
+    // Aptitudes & projet (colonnes présentes dans le schéma)
+    niveau_langue: obj.niveauLangue || null,
+    projet_pro:    obj.projetPro    || null,
+
+    // Candidat
+    is_candidat:          true,
+    candidature_recue_le: obj.candidatureRecueLe || null,
+    message_candidature:  obj.messageCandidature  || null,
+
+    // Sécurité sociale
+    num_secu_sociale: obj.numSecuSociale || null,
+    // Passage précédent
+    previous_salarie_id: obj.previousSalarieId || null,
+  };
+};
 
 /** Objet JS → payload DB (null pour les champs vides, car Supabase préfère null) */
 export const mapSalarieToDB = (obj) => ({
@@ -286,27 +361,24 @@ export const mapSalarieToDB = (obj) => ({
   synth_besoins_sortie: obj.synthBesoinsSortie || null,
   synth_parcours:       obj.synthParcours      || null,
 
-  // Candidat
-  is_candidat:           obj.isCandidat          ?? false,
-  candidature_recue_le:  obj.candidatureRecueLe  || null,
-  appeler_le:            obj.appelerLe           || null,
-  vu_entretien_le:       obj.vuEntretienLe       || null,
-  impression_globale:    obj.impressionGlobale   || null,
-  impression_detail:     obj.impressionDetail    || null,
-  orientation_candidat:  obj.orientationCandidat || null,
-  orientation_motif:     obj.orientationMotif    || null,
-  orientation_site_ids:  obj.orientationSiteIds  ?? [],
-  orientation_site_id:   obj.orientationSiteIds?.[0] ?? null,  // rétrocompat
-  activites_prio:        obj.activitesPrio       ?? [],
-  // Entretien candidat — champs complémentaires
-  autre_accompagnateur:  obj.autreAccompagnateur || null,
-  en_recherche_depuis:   obj.enRecherchDepuis    || null,
-  piece_identite:        obj.pieceIdentite       || null,
-  titre_sejour_validite: obj.titreSejourValidite || null,
-  contrainte_physique:   obj.contraintePhysique  || null,
-  contrainte_horaire:    obj.contrainteHoraire   || null,
+  // Candidat — colonnes confirmées en DB
+  is_candidat:          obj.isCandidat          ?? false,
+  candidature_recue_le: obj.candidatureRecueLe  || null,
+  appeler_le:           obj.appelerLe           || null,
+  vu_entretien_le:      obj.vuEntretienLe       || null,
+  impression_globale:   obj.impressionGlobale   || null,
+  impression_detail:    obj.impressionDetail    || null,
+  orientation_candidat: obj.orientationCandidat || null,
+  orientation_motif:    obj.orientationMotif    || null,
+  message_candidature:  obj.messageCandidature  || null,
   // Sécurité sociale
-  num_secu_sociale:      obj.numSecuSociale      || null,
+  num_secu_sociale:     obj.numSecuSociale      || null,
+  // Passage précédent
+  previous_salarie_id:  obj.previousSalarieId   || null,
+  // NOTE : colonnes à ajouter via migration si besoin :
+  // activites_prio, orientation_site_ids, orientation_site_id,
+  // autre_accompagnateur, en_recherche_depuis, piece_identite,
+  // titre_sejour_validite, contrainte_physique, contrainte_horaire
 });
 
 // ─── ENTRETIEN ────────────────────────────────────────────────────────────────

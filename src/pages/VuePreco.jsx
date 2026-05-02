@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { daysUntil, dureeM, urgC, fmt } from "../lib/utils";
+import { SiteOptions } from "../components/ui";
 
 export default function VuePreco({ user, salaries, sites, entretiens, setPage, setSelectedSalarie, onOpenSortie }) {
   const [fs,     setFs]     = useState(user.site_id || "all");
@@ -28,7 +29,7 @@ export default function VuePreco({ user, salaries, sites, entretiens, setPage, s
           {user.role === "admin" && (
             <select className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white" value={fs} onChange={e => setFs(e.target.value)}>
               <option value="all">Tous les sites</option>
-              {sites.map(s => <option key={s.id} value={s.id}>{s.nom}</option>)}
+              <SiteOptions sites={sites} />
             </select>
           )}
           <div className="flex gap-1 bg-gray-100 rounded-xl p-1">

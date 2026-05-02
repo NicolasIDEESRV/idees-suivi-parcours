@@ -46,12 +46,15 @@ export const newSal = (o = {}) => ({
   orientationCandidat: "", orientationMotif: "", orientationSiteIds: [],
   interimPropose: false,
   activitesPrio: [],
+  messageCandidature: "",
   // Entretien candidat — champs complémentaires
   autreAccompagnateur: "", enRecherchDepuis: "",
   pieceIdentite: "", titreSejourValidite: "",
   contraintePhysique: "", contrainteHoraire: "",
   // Sécurité sociale
   numSecuSociale: "",
+  // Lien vers un passage précédent (récupération de données)
+  previousSalarieId: null,
   ...o,
 });
 

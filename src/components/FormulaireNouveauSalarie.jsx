@@ -1,127 +1,204 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { PRESCRIPTEURS, NIVEAUX, FREINS, FREINS_E, NIVEAUX_LANGUE, DOMAINES_PRO, MOYENS_TRANSPORT, JALONS_DEF } from "../lib/constants";
-import { fmt, addDays } from "../lib/utils";
+import { fmt, addDays, todayStr } from "../lib/utils";
 import { fC } from "../lib/theme";
 import { newSal } from "../lib/data";
-import { checkNumSecuUnique } from "../lib/api/salaries";
-import { FInput, FSelect, FCheck, FTextarea, FSec } from "./ui";
+import { checkNumSecuUnique, getSalarieById } from "../lib/api/salaries";
+import { FInput, FSelect, FCheck, FTextarea, FSec, SiteOptions } from "./ui";
 
-// ─── Sélecteur multi-sites (Activités PRIO pour candidats) ──────────────────
-function ActivitesPrioSelector({ sites, value = [], onChange }) {
-  const filialesList = [...new Set(sites.map(s => s.filiale).filter(Boolean))];
-  const [openFil, setOpenFil] = useState(null);
+function SectionTitle({ children }) {
+  return <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1 mb-2">{children}</p>;
+}
 
-  const toggle = (siteId) => {
-    onChange(value.includes(siteId) ? value.filter(id => id !== siteId) : [...value, siteId]);
-  };
+// ─── Champs à pré-remplir depuis un ancien passage ───────────────────────────
+// Identité + situation + formation + mobilité + projet ; on exclut les champs
+// spécifiques au nouveau passage (dates contrat, candidatureRecueLe, site_id…)
+const PREFILL_KEYS = [
+  "nom","prenom","sexe","dateNaissance","nationalite",
+  "adresse","cp","ville","telephone","mail",
+  "deld","th","rqth","ass","sansRessources","residentQPV","brsa",
+  "prescripteur","nomPrenomPrescripteur","autreAccompagnateur",
+  "situationMaritale","nbEnfants","hebergement",
+  "css","cssJusquau","revenus","charges",
+  "niveauFormation","niveauLangue","lecture","ecriture","calcul","diplomes","cv",
+  "permisB","vehicule","moyenTransport","deplacements",
+  "freinsEntree","projetPro","domainesPro","preconisation","synthBesoinsEntree",
+];
 
+// ─── Modale de confirmation récupération ─────────────────────────────────────
+function ModalRecuperer({ dupe, onRecuperer, onIgnorer, onClose, loading }) {
+  const typLabel = dupe.is_candidat ? "candidat(e)" : "salarié(e)";
   return (
-    <div className="space-y-2">
-      {filialesList.map(fil => {
-        const filSites = sites.filter(s => s.filiale === fil);
-        const isOpen   = openFil === fil;
-        const selCount = filSites.filter(s => value.includes(s.id)).length;
-        return (
-          <div key={fil} className="border border-gray-200 rounded-xl overflow-hidden">
-            <button type="button"
-              onClick={() => setOpenFil(isOpen ? null : fil)}
-              className="w-full flex items-center justify-between px-3 py-2 bg-gray-50 hover:bg-gray-100 transition-colors"
-            >
-              <span className="text-xs font-semibold text-gray-700">{fil}</span>
-              <div className="flex items-center gap-2">
-                {selCount > 0 && (
-                  <span className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">{selCount} sélectionné{selCount > 1 ? "s" : ""}</span>
-                )}
-                <span className="text-gray-400 text-xs">{isOpen ? "▲" : "▼"}</span>
-              </div>
-            </button>
-            {isOpen && (
-              <div className="p-2 space-y-1">
-                {filSites.map(s => (
-                  <label key={s.id} className="flex items-center gap-2 cursor-pointer px-2 py-1.5 rounded-lg hover:bg-gray-50">
-                    <input type="checkbox"
-                      checked={value.includes(s.id)}
-                      onChange={() => toggle(s.id)}
-                      className="rounded border-gray-300 accent-indigo-600"
-                    />
-                    <span className="text-xs text-gray-700">
-                      {[s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
-                    </span>
-                  </label>
-                ))}
-              </div>
-            )}
+    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.55)", zIndex:200, display:"flex", alignItems:"center", justifyContent:"center", padding:"2rem" }}>
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 space-y-4">
+        <div className="flex items-start gap-3">
+          <span className="text-3xl">🔄</span>
+          <div>
+            <h3 className="font-bold text-gray-900">Fiche existante trouvée</h3>
+            <p className="text-sm text-gray-500 mt-0.5">Ce numéro correspond à un ancien passage</p>
           </div>
-        );
-      })}
-      {value.length > 0 && (
-        <div className="flex flex-wrap gap-1 pt-1">
-          {value.map(id => {
-            const s = sites.find(x => x.id === id);
-            if (!s) return null;
-            return (
-              <span key={id} className="inline-flex items-center gap-1 bg-indigo-100 text-indigo-800 text-xs font-medium px-2 py-0.5 rounded-full border border-indigo-200">
-                {[s.filiale, s.nom].filter(Boolean).join(" › ")}
-                <button type="button" onClick={() => toggle(id)} className="ml-0.5 text-indigo-400 hover:text-red-500">×</button>
-              </span>
-            );
-          })}
         </div>
-      )}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-1 text-sm">
+          <p className="font-semibold text-amber-900">{dupe.prenom} {dupe.nom}</p>
+          <p className="text-amber-700">Ancien(ne) {typLabel}</p>
+          {dupe.date_entree && (
+            <p className="text-amber-700 text-xs">
+              Passage du <strong>{fmt(dupe.date_entree)}</strong>
+              {dupe.date_sortie ? <> au <strong>{fmt(dupe.date_sortie)}</strong></> : " — en cours"}
+            </p>
+          )}
+        </div>
+        <p className="text-sm text-gray-600">
+          Souhaitez-vous récupérer ses données (identité, situation, compétences, mobilité…) pour pré-remplir ce nouveau dossier ?
+        </p>
+        <p className="text-xs text-gray-400 bg-gray-50 rounded-xl px-3 py-2">
+          Une <strong>nouvelle fiche indépendante</strong> sera créée. L'ancienne reste intacte. L'historique des entretiens précédents sera accessible dans la nouvelle fiche.
+        </p>
+        <div className="flex gap-3 pt-1">
+          <button onClick={onIgnorer} className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+            Créer sans récupérer
+          </button>
+          <button onClick={onRecuperer} disabled={loading}
+            className="flex-1 px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center justify-center gap-2">
+            {loading && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+            ✓ Récupérer les données
+          </button>
+        </div>
+        <button onClick={onClose} className="w-full text-xs text-gray-400 hover:text-gray-600 pt-1">Annuler</button>
+      </div>
     </div>
   );
 }
 
 // ─── Formulaire principal ─────────────────────────────────────────────────────
-export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClose, user }) {
-  const [form,    setForm]    = useState(initial || newSal({ site_id: user.site_id || "", cip_id: user.id }));
-  const [step,    setStep]    = useState(0);
-  const [saveErr, setSaveErr] = useState("");
-  const [saving,  setSaving]  = useState(false);
-
-  const upd  = (k, v) => setForm(f => ({ ...f, [k]: v }));
-  const updF = (t, f, v) => setForm(fm => ({ ...fm, [t]: { ...fm[t], [f]: v } }));
-
-  // ── Étapes selon type ──────────────────────────────────────────────────────
-  const STEPS = form.isCandidat
-    ? ["Identité", "Situation", "Formation & mobilité", "Freins & projet", "Candidature", "Résumé"]
-    : ["Identité & parcours", "Situation", "Formation & mobilité", "Freins & projet", "Résumé"];
-
+export default function FormulaireNouveauSalarie({
+  initial, sites, onSave, onSaveEntretien, onClose, user, users = []
+}) {
   // ── Sites accessibles selon le rôle ───────────────────────────────────────
   const accessibleSites = user.role === "admin"
     ? sites
     : sites.filter(s => (user.site_ids?.length ? user.site_ids : (user.site_id ? [user.site_id] : [])).includes(s.id));
 
-  // ── Validation obligatoires ────────────────────────────────────────────────
-  const okBase = !!(form.nom && form.prenom && form.telephone && form.numSecuSociale);
-  const okCandidat = okBase && !!(form.candidatureRecueLe) && form.activitesPrio.length > 0 &&
-    (!form.vuEntretienLe || (
-      form.impressionGlobale && form.orientationCandidat &&
-      (form.orientationCandidat === "evaluation" || form.orientationCandidat === "decliner" || form.orientationCandidat === "vivier" || form.orientationSiteIds?.length > 0)
-    ));
-  const okSal = okBase && !!(form.dateEntree && form.dateFinContrat && form.dateFinAgrement && form.site_id);
-  const ok = form.isCandidat ? okCandidat : okSal;
+  const initForm = initial || newSal({ site_id: user.site_id || "", cip_id: user.id });
+  const autoSiteId = !initForm.site_id && accessibleSites.length === 1 ? accessibleSites[0].id : (initForm.site_id || "");
+  const [form, setForm] = useState({ ...initForm, site_id: autoSiteId, messageCandidature: initForm.messageCandidature || "" });
+  const [step,    setStep]    = useState(0);
+  const [saveErr, setSaveErr] = useState("");
+  const [saving,  setSaving]  = useState(false);
 
-  // ── Enregistrement avec vérification unicité ───────────────────────────────
+  // ── État validation N° Sécu ───────────────────────────────────────────────
+  // null | { status: 'checking'|'active'|'inactive', dupe? }
+  const [secuStatus,     setSecuStatus]     = useState(null);
+  const [secuLoading,    setSecuLoading]    = useState(false);
+  const [showRecupModal, setShowRecupModal] = useState(false);
+  const [recupLoading,   setRecupLoading]   = useState(false);
+  // Pré-remplissage : source (pour la bannière) + clés récupérées (pour le highlight)
+  const [prefillSource,  setPrefillSource]  = useState(null); // { prenom, nom, dateEntree, dateSortie, isCandidat }
+  const [prefilledKeys,  setPrefilledKeys]  = useState(new Set());
+
+  const upd  = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const updF = (t, f, v) => setForm(fm => ({ ...fm, [t]: { ...fm[t], [f]: v } }));
+  const hl   = (k) => prefilledKeys.has(k); // highlight prop helper
+
+  // ── Étapes selon type ─────────────────────────────────────────────────────
+  const STEPS = form.isCandidat
+    ? ["Identité & candidature", "Résumé"]
+    : ["Identité & parcours", "Situation", "Formation & mobilité", "Freins & projet", "Résumé"];
+
+  // ── Validation ────────────────────────────────────────────────────────────
+  const okCandidat = !!(form.nom && form.prenom && form.numSecuSociale && form.sexe
+    && form.dateNaissance && form.candidatureRecueLe && form.site_id);
+  const okSal = !!(form.nom && form.prenom && form.telephone && form.numSecuSociale &&
+    form.dateEntree && form.dateFinContrat && form.dateFinAgrement && form.site_id);
+  const ok = form.isCandidat ? okCandidat : okSal;
+  const secuBlocked = secuStatus?.status === "active"; // bloque la soumission
+
+  // ── Vérification N° Sécu en temps réel (onBlur) ───────────────────────────
+  const handleNumSecuBlur = useCallback(async () => {
+    const val = form.numSecuSociale?.trim();
+    if (!val || val.length < 10) { setSecuStatus(null); return; }
+    setSecuLoading(true);
+    setSecuStatus({ status: "checking" });
+    try {
+      const dupes = await checkNumSecuUnique(val, form.id || null);
+      if (dupes.length === 0) {
+        setSecuStatus(null);
+        return;
+      }
+      const dupe = dupes[0];
+      const isActive = !dupe.date_sortie; // salarié/candidat sans date de sortie = actif
+      const status = isActive ? "active" : "inactive";
+      setSecuStatus({ status, dupe });
+      if (status === "inactive") setShowRecupModal(true);
+    } catch {
+      setSecuStatus(null);
+    } finally {
+      setSecuLoading(false);
+    }
+  }, [form.numSecuSociale, form.id]);
+
+  // Réinitialiser le statut si l'utilisateur retape le numéro
+  const handleNumSecuChange = (val) => {
+    upd("numSecuSociale", val.trim());
+    if (secuStatus) setSecuStatus(null);
+    if (prefilledKeys.size > 0 && !prefillSource) setPrefilledKeys(new Set());
+  };
+
+  // ── Récupérer les données de l'ancien passage ──────────────────────────────
+  const handleRecuperer = async () => {
+    if (!secuStatus?.dupe?.id) return;
+    setRecupLoading(true);
+    try {
+      const old = await getSalarieById(secuStatus.dupe.id);
+      if (!old) return;
+
+      // Champs à transférer (sauf ceux propres au nouveau passage)
+      const updates = {};
+      const filled = new Set();
+      PREFILL_KEYS.forEach(k => {
+        const v = old[k];
+        const isEmpty = v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0) || (typeof v === "object" && !Array.isArray(v) && Object.keys(v).length === 0);
+        if (!isEmpty) {
+          updates[k] = v;
+          filled.add(k);
+        }
+      });
+
+      setForm(f => ({
+        ...f,
+        ...updates,
+        // Toujours garder le numéro sécu déjà saisi + le site courant
+        numSecuSociale: f.numSecuSociale,
+        site_id:        f.site_id,
+        previousSalarieId: old.id,
+      }));
+      setPrefillSource({ prenom: old.prenom, nom: old.nom, dateEntree: old.dateEntree, dateSortie: old.dateSortie, isCandidat: old.isCandidat });
+      setPrefilledKeys(filled);
+      setShowRecupModal(false);
+    } catch (e) {
+      console.error("Récupération échouée :", e);
+    } finally {
+      setRecupLoading(false);
+    }
+  };
+
+  // ── Enregistrement ────────────────────────────────────────────────────────
   const handleSubmit = async () => {
-    if (!ok) return;
+    if (!ok || secuBlocked) return;
     setSaveErr("");
     setSaving(true);
     try {
-      // Vérifier unicité du numéro de sécurité sociale
+      // Vérification finale doublon (au cas où l'onBlur n'aurait pas été déclenché)
       if (form.numSecuSociale) {
         const dupes = await checkNumSecuUnique(form.numSecuSociale, form.id || null);
         if (dupes.length > 0) {
           const d = dupes[0];
-          const site = sites.find(s => s.id === d.site_id);
-          const siteLabel = site
-            ? [site.filiale, site.secteur, site.activite, site.nom].filter(Boolean).join(" › ")
-            : "—";
-          setSaveErr(
-            `N° de sécurité sociale déjà enregistré pour ${d.nom} ${d.prenom} ` +
-            `(${d.is_candidat ? "Candidat" : "Salarié"} · ${siteLabel})`
-          );
-          return;
+          if (!d.date_sortie) {
+            const site = sites.find(s => s.id === d.site_id);
+            const siteLabel = site ? [site.filiale, site.secteur, site.activite, site.nom].filter(Boolean).join(" › ") : "—";
+            setSaveErr(`Un salarié actif avec ce numéro de sécurité sociale existe déjà : ${d.prenom} ${d.nom} (${d.is_candidat ? "Candidat" : "Salarié"} · ${siteLabel})`);
+            return;
+          }
         }
       }
       await onSave(form);
@@ -133,460 +210,499 @@ export default function FormulaireNouveauSalarie({ initial, sites, onSave, onClo
   };
 
   return (
-    <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:100, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"2rem", overflowY:"auto" }}>
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl mb-8">
+    <>
+      {/* Modale récupération ancien passage */}
+      {showRecupModal && secuStatus?.dupe && (
+        <ModalRecuperer
+          dupe={secuStatus.dupe}
+          loading={recupLoading}
+          onRecuperer={handleRecuperer}
+          onIgnorer={() => setShowRecupModal(false)}
+          onClose={() => { setShowRecupModal(false); setSecuStatus(null); }}
+        />
+      )}
 
-        {/* ── En-tête ── */}
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <div>
-            <h2 className="font-bold text-gray-900 text-lg">
-              {initial?.id ? "Modifier" : form.isCandidat ? "Nouveau candidat" : "Nouveau salarié"}
-            </h2>
-            <p className="text-sm text-gray-400">{STEPS[step]} — {step + 1}/{STEPS.length}</p>
+      <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.45)", zIndex:100, display:"flex", alignItems:"flex-start", justifyContent:"center", padding:"2rem", overflowY:"auto" }}>
+        <div className="bg-white rounded-2xl w-full max-w-2xl shadow-2xl mb-8">
+
+          {/* ── En-tête ── */}
+          <div className="flex items-center justify-between p-5 border-b border-gray-100">
+            <div>
+              <h2 className="font-bold text-gray-900 text-lg">
+                {initial?.id ? "Modifier" : form.isCandidat ? "Nouveau candidat" : "Nouveau salarié"}
+              </h2>
+              <p className="text-sm text-gray-400">{STEPS[step]} — {step + 1}/{STEPS.length}</p>
+            </div>
+            <button onClick={onClose} className="text-gray-300 text-2xl hover:text-gray-500">×</button>
           </div>
-          <button onClick={onClose} className="text-gray-300 text-2xl hover:text-gray-500">×</button>
-        </div>
 
-        {/* ── Barre de progression ── */}
-        <div className="px-5 pt-3">
-          <div className="flex gap-1.5">
-            {STEPS.map((_, i) => (
-              <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-indigo-500" : "bg-gray-100"}`} />
-            ))}
+          {/* ── Bannière pré-remplissage ── */}
+          {prefillSource && (
+            <div className="mx-5 mt-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <span className="text-xl shrink-0">↩</span>
+              <div className="text-xs text-amber-800">
+                <p className="font-semibold">Données récupérées depuis l'ancien dossier</p>
+                <p className="text-amber-700 mt-0.5">
+                  {prefillSource.prenom} {prefillSource.nom} ·{" "}
+                  {prefillSource.isCandidat ? "Candidat(e)" : "Salarié(e)"} ·{" "}
+                  passage du {fmt(prefillSource.dateEntree) || "—"}
+                  {prefillSource.dateSortie ? ` au ${fmt(prefillSource.dateSortie)}` : ""}
+                </p>
+                <p className="text-amber-600 mt-0.5">Les champs marqués <strong>↩ récupéré</strong> sont pré-remplis — vérifiez-les avant de valider.</p>
+              </div>
+              <button onClick={() => { setPrefillSource(null); setPrefilledKeys(new Set()); }}
+                className="ml-auto text-amber-400 hover:text-amber-600 shrink-0 text-lg">×</button>
+            </div>
+          )}
+
+          {/* ── Barre de progression ── */}
+          <div className="px-5 pt-3">
+            <div className="flex gap-1.5">
+              {STEPS.map((_, i) => (
+                <div key={i} className={`h-1.5 flex-1 rounded-full ${i <= step ? "bg-indigo-500" : "bg-gray-100"}`} />
+              ))}
+            </div>
           </div>
-        </div>
 
-        {/* ── Contenu ── */}
-        <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
+          {/* ── Contenu ── */}
+          <div className="p-5 space-y-4 max-h-[60vh] overflow-y-auto">
 
-          {/* ═══════════════════════════════════════════════════
-              ÉTAPE 0 — Identité (commune + spécifique par type)
-          ═══════════════════════════════════════════════════ */}
-          {step === 0 && (
-            <div className="grid grid-cols-2 gap-4">
-              <FSec>État civil</FSec>
-              <FInput label="NOM *"    required value={form.nom}    onChange={e => upd("nom",    e.target.value.toUpperCase())} />
-              <FInput label="Prénom *" required value={form.prenom} onChange={e => upd("prenom", e.target.value)} />
-              <FInput label="Téléphone *" required value={form.telephone} onChange={e => upd("telephone", e.target.value)} />
-              <FInput label="Mail" value={form.mail} onChange={e => upd("mail", e.target.value)} />
-              <FInput label="Date de naissance" type="date" value={form.dateNaissance} onChange={e => upd("dateNaissance", e.target.value)} />
-              <FSelect label="Sexe" value={form.sexe} onChange={e => upd("sexe", e.target.value)}>
-                <option value="">—</option><option>F</option><option>M</option>
-              </FSelect>
+            {/* ═══ CANDIDAT — Étape 0 : Identité & candidature ════════════════ */}
+            {form.isCandidat && step === 0 && (
+              <div className="space-y-6">
 
-              {/* N° de sécurité sociale — obligatoire pour les deux types */}
-              <div className="col-span-2">
-                <FInput label="N° Sécurité sociale *" required
-                  value={form.numSecuSociale}
-                  onChange={e => upd("numSecuSociale", e.target.value.trim())}
-                  placeholder="1 84 12 75 108 042 68"
-                />
-                {saveErr && (
-                  <p className="mt-1 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{saveErr}</p>
-                )}
-              </div>
+                {/* État civil obligatoire */}
+                <div>
+                  <SectionTitle>État civil *</SectionTitle>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FInput label="NOM *" required highlight={hl("nom")} value={form.nom}
+                      onChange={e => upd("nom", e.target.value.toUpperCase())} />
+                    <FInput label="Prénom *" required highlight={hl("prenom")} value={form.prenom}
+                      onChange={e => upd("prenom", e.target.value)} />
+                    <FSelect label="Sexe *" required highlight={hl("sexe")} value={form.sexe}
+                      onChange={e => upd("sexe", e.target.value)}>
+                      <option value="">—</option><option>F</option><option>M</option>
+                    </FSelect>
+                    <FInput label="Date de naissance *" type="date" required highlight={hl("dateNaissance")}
+                      value={form.dateNaissance}
+                      onChange={e => upd("dateNaissance", e.target.value)} />
+                    <div className="col-span-2">
+                      <FInput label="N° Sécurité sociale *" required
+                        value={form.numSecuSociale}
+                        onChange={e => handleNumSecuChange(e.target.value)}
+                        onBlur={handleNumSecuBlur}
+                        placeholder="1 84 12 75 108 042 68"
+                      />
+                      {/* Statut du contrôle N° sécu */}
+                      {secuLoading && (
+                        <p className="mt-1 text-xs text-gray-400 flex items-center gap-1.5">
+                          <span className="w-3 h-3 border-2 border-gray-300 border-t-indigo-400 rounded-full animate-spin inline-block" />
+                          Vérification en cours…
+                        </p>
+                      )}
+                      {secuStatus?.status === "active" && (
+                        <p className="mt-1 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                          🚫 <strong>Un salarié actif avec ce numéro de sécurité sociale existe déjà</strong>
+                          {" "}— {secuStatus.dupe.prenom} {secuStatus.dupe.nom}
+                        </p>
+                      )}
+                      {saveErr && (
+                        <p className="mt-1 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{saveErr}</p>
+                      )}
+                    </div>
+                    <div className="col-span-2">
+                      <FInput label="Candidature reçue le *" required type="date"
+                        value={form.candidatureRecueLe}
+                        onChange={e => upd("candidatureRecueLe", e.target.value)} />
+                    </div>
 
-              {/* ── Champs SALARIÉ uniquement ── */}
-              {!form.isCandidat && (
-                <>
-                  <FSec>Parcours</FSec>
-                  <FInput label="Date d'entrée *"   required type="date" value={form.dateEntree}     onChange={e => upd("dateEntree",     e.target.value)} />
-                  <FInput label="Fin de contrat *"  required type="date" value={form.dateFinContrat}  onChange={e => upd("dateFinContrat",  e.target.value)} />
-                  <FInput label="Fin d'agrément *"  required type="date" value={form.dateFinAgrement} onChange={e => upd("dateFinAgrement", e.target.value)} />
-                  <FSelect label="Prescripteur" value={form.prescripteur} onChange={e => upd("prescripteur", e.target.value)}>
-                    {PRESCRIPTEURS.map(p => <option key={p}>{p}</option>)}
-                  </FSelect>
-                  <FInput label="Référent prescripteur" value={form.nomPrenomPrescripteur} onChange={e => upd("nomPrenomPrescripteur", e.target.value)} />
-
-                  {/* Site — visible pour tous les rôles, obligatoire */}
-                  <FSelect label={`Site *${accessibleSites.length <= 1 ? " (auto)" : ""}`}
-                    required
-                    value={form.site_id || ""}
-                    onChange={e => upd("site_id", e.target.value)}
-                    disabled={accessibleSites.length === 1}
-                  >
-                    <option value="">— Sélectionner un site —</option>
-                    {accessibleSites.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}
-                      </option>
-                    ))}
-                  </FSelect>
-                </>
-              )}
-
-              <FSec>Publics prioritaires</FSec>
-              <div className="col-span-2 grid grid-cols-2 gap-3">
-                <FCheck label="DELD"         checked={form.deld}        onChange={e => upd("deld",        e.target.checked)} />
-                <FCheck label="TH"           checked={form.th}          onChange={e => upd("th",          e.target.checked)} />
-                <FCheck label="RQTH"         checked={form.rqth}        onChange={e => upd("rqth",        e.target.checked)} />
-                <FCheck label="Résident QPV" checked={form.residentQPV} onChange={e => upd("residentQPV", e.target.checked)} />
-              </div>
-              <div className="col-span-2">
-                <p className="text-xs font-medium text-gray-600 mb-2">Allocation / Ressources <span className="text-gray-400">(un seul choix)</span></p>
-                <div className="flex gap-3 flex-wrap">
-                  {[
-                    { key: "brsa",           label: "BRSA" },
-                    { key: "ass",            label: "ASS" },
-                    { key: "sansRessources", label: "Sans ressources" },
-                  ].map(({ key, label }) => (
-                    <button key={key} type="button"
-                      onClick={() => setForm(f => ({
-                        ...f,
-                        brsa:          key === "brsa"           ? !f.brsa          : false,
-                        ass:           key === "ass"            ? !f.ass           : false,
-                        sansRessources:key === "sansRessources" ? !f.sansRessources: false,
-                      }))}
-                      className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
-                        form[key] ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
-                      }`}
-                    >{label}</button>
-                  ))}
+                    {accessibleSites.length > 1 && (
+                      <div className="col-span-2">
+                        <FSelect label="Filiale / Activité *" required value={form.site_id || ""}
+                          onChange={e => upd("site_id", e.target.value)}>
+                          <option value="">— Sélectionner une activité —</option>
+                          <SiteOptions sites={accessibleSites} />
+                        </FSelect>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
 
-              {/* ── Champs CANDIDAT : accompagnement & identification ── */}
-              {form.isCandidat && (
-                <>
-                  <FSec>Accompagnement</FSec>
-                  <FSelect label="Prescripteur" value={form.prescripteur} onChange={e => upd("prescripteur", e.target.value)}>
-                    {PRESCRIPTEURS.map(p => <option key={p}>{p}</option>)}
-                  </FSelect>
-                  <FInput label="Référent prescripteur" value={form.nomPrenomPrescripteur}
-                    onChange={e => upd("nomPrenomPrescripteur", e.target.value)}
-                    placeholder="Prénom NOM, organisme" />
-                  <FInput label="Autre accompagnateur" value={form.autreAccompagnateur}
-                    onChange={e => upd("autreAccompagnateur", e.target.value)}
-                    placeholder="CIP, AS, ML, autre organisme…" />
-                  <FSelect label="En recherche active depuis" value={form.enRecherchDepuis}
-                    onChange={e => upd("enRecherchDepuis", e.target.value)}>
-                    <option value="">—</option>
-                    {["Moins de 6 mois","6 à 12 mois","1 à 2 ans","2 à 5 ans","Plus de 5 ans"].map(o => <option key={o}>{o}</option>)}
-                  </FSelect>
-                </>
-              )}
-            </div>
-          )}
+                {/* Coordonnées optionnelles */}
+                <div>
+                  <SectionTitle>Coordonnées</SectionTitle>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FInput label="Téléphone" highlight={hl("telephone")} value={form.telephone}
+                      onChange={e => upd("telephone", e.target.value)} />
+                    <FInput label="Mail" highlight={hl("mail")} value={form.mail}
+                      onChange={e => upd("mail", e.target.value)} />
+                  </div>
+                </div>
 
-          {/* ═══════════════════════════════════════
-              ÉTAPE 1 — Situation
-          ═══════════════════════════════════════ */}
-          {step === 1 && (
-            <div className="grid grid-cols-2 gap-4">
-              <FSec>Situation familiale</FSec>
-              <FSelect label="Situation maritale" value={form.situationMaritale} onChange={e => upd("situationMaritale", e.target.value)}>
-                <option value="">—</option>
-                {["Célibataire","En couple","Marié(e)","Divorcé(e)","Veuf/veuve"].map(v => <option key={v}>{v}</option>)}
-              </FSelect>
-              <FInput label="Nb enfants" type="number" min="0" value={form.nbEnfants} onChange={e => upd("nbEnfants", +e.target.value)} />
-              <FSec>Logement &amp; Santé</FSec>
-              <FSelect label="Hébergement" value={form.hebergement} onChange={e => upd("hebergement", e.target.value)}>
-                <option value="">—</option>
-                {["Locataire","Propriétaire","Hébergé (famille)","Hébergé (tiers)","CHRS","SDF","Autre"].map(v => <option key={v}>{v}</option>)}
-              </FSelect>
-              <div>
-                <FCheck label="CSS / Mutuelle" checked={form.css} onChange={e => upd("css", e.target.checked)} />
-                {form.css && <div className="mt-2"><FInput label="Jusqu'au" type="date" value={form.cssJusquau} onChange={e => upd("cssJusquau", e.target.value)} /></div>}
-              </div>
-              <FSec>Ressources</FSec>
-              <FInput label="Revenus (€/mois)" type="number" value={form.revenus} onChange={e => upd("revenus", +e.target.value)} />
-              <FInput label="Charges (€/mois)" type="number" value={form.charges} onChange={e => upd("charges", +e.target.value)} />
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════
-              ÉTAPE 2 — Formation & mobilité
-          ═══════════════════════════════════════ */}
-          {step === 2 && (
-            <div className="grid grid-cols-2 gap-4">
-              <FSec>Formation</FSec>
-              <FSelect label="Niveau de formation" value={form.niveauFormation} onChange={e => upd("niveauFormation", e.target.value)}>
-                {NIVEAUX.map(n => <option key={n}>{n}</option>)}
-              </FSelect>
-              <FSelect label="Niveau de langue" value={form.niveauLangue} onChange={e => upd("niveauLangue", e.target.value)}>
-                {NIVEAUX_LANGUE.map(n => <option key={n}>{n}</option>)}
-              </FSelect>
-              <div className="col-span-2 flex gap-6">
-                <FCheck label="Lecture"  checked={form.lecture}  onChange={e => upd("lecture",  e.target.checked)} />
-                <FCheck label="Écriture" checked={form.ecriture} onChange={e => upd("ecriture", e.target.checked)} />
-                <FCheck label="Calcul"   checked={form.calcul}   onChange={e => upd("calcul",   e.target.checked)} />
-              </div>
-              <FInput label="Diplômes" value={form.diplomes} onChange={e => upd("diplomes", e.target.value)} />
-              <div><FCheck label="CV disponible" checked={form.cv} onChange={e => upd("cv", e.target.checked)} /></div>
-              <FSec>Mobilité</FSec>
-              <div className="col-span-2 flex gap-6">
-                <FCheck label="Permis B"           checked={form.permisB}  onChange={e => upd("permisB",  e.target.checked)} />
-                <FCheck label="Véhicule personnel" checked={form.vehicule} onChange={e => upd("vehicule", e.target.checked)} />
-              </div>
-              <FSelect label="Moyen de transport" value={form.moyenTransport} onChange={e => upd("moyenTransport", e.target.value)}>
-                <option value="">—</option>
-                {MOYENS_TRANSPORT.map(m => <option key={m}>{m}</option>)}
-              </FSelect>
-              <FInput label="Zone de déplacement" value={form.deplacements} onChange={e => upd("deplacements", e.target.value)} />
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════
-              ÉTAPE 3 — Freins & projet
-          ═══════════════════════════════════════ */}
-          {step === 3 && (
-            <div className="grid grid-cols-2 gap-4">
-              <FSec>Freins à l&apos;entrée</FSec>
-              {FREINS.map(f => (
-                <div key={f}>
-                  <label className="text-xs font-medium text-gray-600 uppercase tracking-wide block mb-1">{f}</label>
-                  <div className="flex gap-1 flex-wrap">
-                    {FREINS_E.map(s => (
-                      <button key={s} onClick={() => updF("freinsEntree", f, form.freinsEntree[f] === s ? "" : s)}
-                        className={`px-2 py-1 rounded-lg text-xs font-medium border ${form.freinsEntree[f] === s ? fC[s] + " border-current" : "bg-gray-50 text-gray-400 border-gray-200"}`}
-                      >{s}</button>
+                {/* Publics prioritaires */}
+                <div>
+                  <SectionTitle>Publics prioritaires</SectionTitle>
+                  <div className="grid grid-cols-2 gap-3 mb-3">
+                    <FCheck label="DELD"         highlight={hl("deld")}        checked={form.deld}        onChange={e => upd("deld",        e.target.checked)} />
+                    <FCheck label="TH"           highlight={hl("th")}          checked={form.th}          onChange={e => upd("th",          e.target.checked)} />
+                    <FCheck label="RQTH"         highlight={hl("rqth")}        checked={form.rqth}        onChange={e => upd("rqth",        e.target.checked)} />
+                    <FCheck label="Résident QPV" highlight={hl("residentQPV")} checked={form.residentQPV} onChange={e => upd("residentQPV", e.target.checked)} />
+                  </div>
+                  <p className="text-xs font-medium text-gray-600 mb-2">Allocation / Ressources <span className="text-gray-400">(un seul choix)</span></p>
+                  <div className="flex gap-3 flex-wrap">
+                    {[
+                      { key: "brsa", label: "BRSA" },
+                      { key: "ass",  label: "ASS"  },
+                      { key: "sansRessources", label: "Sans ressources" },
+                    ].map(({ key, label }) => (
+                      <button key={key} type="button"
+                        onClick={() => setForm(f => ({
+                          ...f,
+                          brsa:           key === "brsa"           ? !f.brsa           : false,
+                          ass:            key === "ass"            ? !f.ass            : false,
+                          sansRessources: key === "sansRessources" ? !f.sansRessources : false,
+                        }))}
+                        className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                          form[key]
+                            ? "bg-indigo-600 text-white border-indigo-600"
+                            : hl(key)
+                              ? "bg-amber-50 text-amber-700 border-amber-300"
+                              : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                        }`}>{label}{hl(key) && !form[key] ? "" : ""}</button>
                     ))}
                   </div>
                 </div>
-              ))}
-              <FSec>Projet professionnel</FSec>
-              <div className="col-span-2">
-                <FInput label="Projet professionnel" value={form.projetPro} onChange={e => upd("projetPro", e.target.value)} />
-              </div>
-              {[0, 1, 2].map(i => (
-                <FSelect key={i} label={`Domaine ${i + 1}`} value={form.domainesPro[i] || ""} onChange={e => { const d = [...form.domainesPro]; d[i] = e.target.value; upd("domainesPro", d); }}>
-                  <option value="">—</option>
-                  {DOMAINES_PRO.map(d => <option key={d}>{d}</option>)}
-                </FSelect>
-              ))}
-              <div className="col-span-2">
-                <FInput label="Préconisation" value={form.preconisation} onChange={e => upd("preconisation", e.target.value)} />
-              </div>
-              <div className="col-span-2">
-                <FTextarea label="Synthèse des besoins à l'entrée" value={form.synthBesoinsEntree} onChange={e => upd("synthBesoinsEntree", e.target.value)} />
-              </div>
-            </div>
-          )}
 
-          {/* ═══════════════════════════════════════
-              ÉTAPE 4 — Candidature (candidats uniquement)
-          ═══════════════════════════════════════ */}
-          {step === 4 && form.isCandidat && (
-            <div className="space-y-5">
+                {/* Accompagnement */}
+                <div>
+                  <SectionTitle>Accompagnement</SectionTitle>
+                  <div className="grid grid-cols-2 gap-4">
+                    <FSelect label="Prescripteur" highlight={hl("prescripteur")} value={form.prescripteur}
+                      onChange={e => upd("prescripteur", e.target.value)}>
+                      <option value="">—</option>
+                      {PRESCRIPTEURS.map(p => <option key={p}>{p}</option>)}
+                    </FSelect>
+                    <FInput label="Référent prescripteur" highlight={hl("nomPrenomPrescripteur")}
+                      value={form.nomPrenomPrescripteur}
+                      onChange={e => upd("nomPrenomPrescripteur", e.target.value)}
+                      placeholder="Prénom NOM, organisme" />
+                    <div className="col-span-2">
+                      <FInput label="Autre accompagnateur" highlight={hl("autreAccompagnateur")}
+                        value={form.autreAccompagnateur}
+                        onChange={e => upd("autreAccompagnateur", e.target.value)}
+                        placeholder="CIP, AS, ML, autre organisme…" />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Message de candidature */}
+                <div>
+                  <SectionTitle>Message de candidature</SectionTitle>
+                  <FTextarea
+                    label="Message / informations transmises"
+                    value={form.messageCandidature}
+                    onChange={e => upd("messageCandidature", e.target.value)}
+                    rows={3}
+                    placeholder="Motivations, disponibilités, informations transmises par le candidat ou le prescripteur…"
+                  />
+                </div>
+
+              </div>
+            )}
+
+            {/* ═══ CANDIDAT — Étape 1 : Résumé ════════════════════════════════ */}
+            {form.isCandidat && step === 1 && (
+              <div className="space-y-4">
+                <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
+                  <h3 className="font-semibold text-purple-900 mb-3">Récapitulatif candidature</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="text-gray-500">Nom :</span> <strong>{form.nom} {form.prenom}</strong></div>
+                    <div><span className="text-gray-500">Né(e) le :</span> {fmt(form.dateNaissance) || "—"}</div>
+                    <div><span className="text-gray-500">Sexe :</span> {form.sexe || "—"}</div>
+                    <div><span className="text-gray-500">N° SS :</span> {form.numSecuSociale || "—"}</div>
+                    <div><span className="text-gray-500">Candidature :</span> {fmt(form.candidatureRecueLe) || "—"}</div>
+                    <div><span className="text-gray-500">Tél :</span> {form.telephone || "—"}</div>
+                    <div><span className="text-gray-500">Mail :</span> {form.mail || "—"}</div>
+                    <div><span className="text-gray-500">Prescripteur :</span> {form.prescripteur || "—"}</div>
+                    {form.site_id && (() => {
+                      const s = sites.find(x => x.id === form.site_id);
+                      return s ? <div className="col-span-2"><span className="text-gray-500">Activité :</span> {[s.filiale, s.secteur !== s.activite ? s.activite : null, s.nom].filter(Boolean).join(" › ")}</div> : null;
+                    })()}
+                    {form.nomPrenomPrescripteur && (
+                      <div className="col-span-2"><span className="text-gray-500">Référent :</span> {form.nomPrenomPrescripteur}</div>
+                    )}
+                    {form.autreAccompagnateur && (
+                      <div className="col-span-2"><span className="text-gray-500">Accompagnateur :</span> {form.autreAccompagnateur}</div>
+                    )}
+                  </div>
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {form.deld && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">DELD</span>}
+                    {form.brsa && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">BRSA</span>}
+                    {form.th   && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">TH</span>}
+                    {form.rqth && <span className="text-xs bg-blue-200 text-blue-800 px-2 py-0.5 rounded-full">RQTH</span>}
+                    {form.ass  && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">ASS</span>}
+                    {form.sansRessources && <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">Sans ressources</span>}
+                    {form.residentQPV   && <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full">QPV</span>}
+                  </div>
+                  {form.messageCandidature && (
+                    <div className="mt-3 p-3 bg-white rounded-lg border border-purple-200">
+                      <p className="text-xs font-semibold text-gray-500 mb-1">Message de candidature</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-line">{form.messageCandidature}</p>
+                    </div>
+                  )}
+                  {prefillSource && (
+                    <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
+                      ↩ Données issues du passage de {prefillSource.prenom} {prefillSource.nom} ({fmt(prefillSource.dateEntree)} → {fmt(prefillSource.dateSortie) || "en cours"})
+                    </div>
+                  )}
+                </div>
+                <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 text-xs text-blue-700">
+                  ℹ️ Les informations complémentaires (entretien, aptitudes, projet, freins…) seront renseignées lors des entretiens de suivi.
+                </div>
+                {!ok && <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-3">⚠ Champs obligatoires manquants (marqués *).</p>}
+                {secuBlocked && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">🚫 Un salarié actif avec ce numéro de sécurité sociale existe déjà.</p>}
+                {saveErr && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{saveErr}</p>}
+              </div>
+            )}
+
+            {/* ═══ SALARIÉ — Étape 0 : Identité & parcours ════════════════════ */}
+            {!form.isCandidat && step === 0 && (
               <div className="grid grid-cols-2 gap-4">
-                <FSec>Dates</FSec>
-                <FInput label="Candidature reçue le *" required type="date" value={form.candidatureRecueLe} onChange={e => upd("candidatureRecueLe", e.target.value)} />
-                <FInput label="Appeler le"              type="date" value={form.appelerLe}           onChange={e => upd("appelerLe",           e.target.value)} />
-                <FInput label="Vu en entretien le"      type="date" value={form.vuEntretienLe}       onChange={e => upd("vuEntretienLe",       e.target.value)} />
-              </div>
+                <FSec>État civil</FSec>
+                <FInput label="NOM *" required highlight={hl("nom")} value={form.nom} onChange={e => upd("nom", e.target.value.toUpperCase())} />
+                <FInput label="Prénom *" required highlight={hl("prenom")} value={form.prenom} onChange={e => upd("prenom", e.target.value)} />
+                <FInput label="Téléphone *" required highlight={hl("telephone")} value={form.telephone} onChange={e => upd("telephone", e.target.value)} />
+                <FInput label="Mail" highlight={hl("mail")} value={form.mail} onChange={e => upd("mail", e.target.value)} />
+                <FInput label="Date de naissance" type="date" highlight={hl("dateNaissance")} value={form.dateNaissance} onChange={e => upd("dateNaissance", e.target.value)} />
+                <FSelect label="Sexe" highlight={hl("sexe")} value={form.sexe} onChange={e => upd("sexe", e.target.value)}>
+                  <option value="">—</option><option>F</option><option>M</option>
+                </FSelect>
 
-              {/* Activités prioritaires — obligatoire */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Activité(s) prioritaire(s) *
-                  <span className="text-gray-400 normal-case font-normal ml-1">— Sélectionner une ou plusieurs filiales/activités</span>
-                </p>
-                <ActivitesPrioSelector
-                  sites={sites}
-                  value={form.activitesPrio}
-                  onChange={v => upd("activitesPrio", v)}
-                />
-                {form.activitesPrio.length === 0 && (
-                  <p className="text-xs text-orange-500 mt-1">Sélectionnez au moins une activité prioritaire.</p>
-                )}
-              </div>
-
-              {/* Impression globale — obligatoire si entretien renseigné */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Impression globale{form.vuEntretienLe ? " *" : ""}
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { val: "tres_bien", label: "Très bien",  sub: "Motivation claire, projet cohérent",          color: "border-green-300"  },
-                    { val: "bien",      label: "Bien",        sub: "Bon profil, quelques points à consolider",    color: "border-blue-300"   },
-                    { val: "doute",     label: "Doute sur…",  sub: "Réserve(s) identifiée(s) — préciser",         color: "border-orange-300" },
-                    { val: "decliner",  label: "À décliner",  sub: "Candidature non retenue",                     color: "border-red-300"    },
-                  ].map(opt => (
-                    <label key={opt.val} className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${form.impressionGlobale === opt.val ? opt.color + " bg-gray-50" : "border-gray-200 hover:" + opt.color}`}>
-                      <input type="radio" name="impression" value={opt.val}
-                        checked={form.impressionGlobale === opt.val}
-                        onChange={() => upd("impressionGlobale", opt.val)}
-                        className="mt-0.5 accent-indigo-600" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{opt.label}</p>
-                        <p className="text-xs text-gray-400">{opt.sub}</p>
-                      </div>
-                    </label>
-                  ))}
+                <div className="col-span-2">
+                  <FInput label="N° Sécurité sociale *" required
+                    value={form.numSecuSociale}
+                    onChange={e => handleNumSecuChange(e.target.value)}
+                    onBlur={handleNumSecuBlur}
+                    placeholder="1 84 12 75 108 042 68"
+                  />
+                  {secuLoading && (
+                    <p className="mt-1 text-xs text-gray-400 flex items-center gap-1.5">
+                      <span className="w-3 h-3 border-2 border-gray-300 border-t-indigo-400 rounded-full animate-spin inline-block" />
+                      Vérification en cours…
+                    </p>
+                  )}
+                  {secuStatus?.status === "active" && (
+                    <p className="mt-1 text-xs text-red-700 bg-red-50 border border-red-200 rounded-lg px-3 py-2 flex items-center gap-1.5">
+                      🚫 <strong>Un salarié actif avec ce numéro de sécurité sociale existe déjà</strong>
+                      {" "}— {secuStatus.dupe.prenom} {secuStatus.dupe.nom}
+                    </p>
+                  )}
+                  {saveErr && (
+                    <p className="mt-1 text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{saveErr}</p>
+                  )}
                 </div>
-                {(form.impressionGlobale === "doute" || form.impressionGlobale === "decliner") && (
-                  <div className="mt-3">
-                    <FInput label={form.impressionGlobale === "doute" ? "Réserve(s) identifiée(s)" : "Motif de déclin"}
-                      value={form.impressionDetail} onChange={e => upd("impressionDetail", e.target.value)} />
+
+                <FSec>Parcours</FSec>
+                <FInput label="Date d'entrée *" required type="date" value={form.dateEntree} onChange={e => upd("dateEntree", e.target.value)} />
+                <FInput label="Fin de contrat *" required type="date" value={form.dateFinContrat} onChange={e => upd("dateFinContrat", e.target.value)} />
+                <FInput label="Fin d'agrément *" required type="date" value={form.dateFinAgrement} onChange={e => upd("dateFinAgrement", e.target.value)} />
+                <FSelect label="Prescripteur" highlight={hl("prescripteur")} value={form.prescripteur} onChange={e => upd("prescripteur", e.target.value)}>
+                  {PRESCRIPTEURS.map(p => <option key={p}>{p}</option>)}
+                </FSelect>
+                <FInput label="Référent prescripteur" highlight={hl("nomPrenomPrescripteur")} value={form.nomPrenomPrescripteur} onChange={e => upd("nomPrenomPrescripteur", e.target.value)} />
+                <FSelect label={`Site *${accessibleSites.length <= 1 ? " (auto)" : ""}`}
+                  required value={form.site_id || ""}
+                  onChange={e => upd("site_id", e.target.value)}
+                  disabled={accessibleSites.length === 1}>
+                  <option value="">— Sélectionner un site —</option>
+                  <SiteOptions sites={accessibleSites} />
+                </FSelect>
+
+                <FSec>Publics prioritaires</FSec>
+                <div className="col-span-2 grid grid-cols-2 gap-3">
+                  <FCheck label="DELD"         highlight={hl("deld")}        checked={form.deld}        onChange={e => upd("deld",        e.target.checked)} />
+                  <FCheck label="TH"           highlight={hl("th")}          checked={form.th}          onChange={e => upd("th",          e.target.checked)} />
+                  <FCheck label="RQTH"         highlight={hl("rqth")}        checked={form.rqth}        onChange={e => upd("rqth",        e.target.checked)} />
+                  <FCheck label="Résident QPV" highlight={hl("residentQPV")} checked={form.residentQPV} onChange={e => upd("residentQPV", e.target.checked)} />
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xs font-medium text-gray-600 mb-2">Allocation / Ressources <span className="text-gray-400">(un seul choix)</span></p>
+                  <div className="flex gap-3 flex-wrap">
+                    {[
+                      { key: "brsa", label: "BRSA" },
+                      { key: "ass",  label: "ASS"  },
+                      { key: "sansRessources", label: "Sans ressources" },
+                    ].map(({ key, label }) => (
+                      <button key={key} type="button"
+                        onClick={() => setForm(f => ({ ...f, brsa: key==="brsa"?!f.brsa:false, ass: key==="ass"?!f.ass:false, sansRessources: key==="sansRessources"?!f.sansRessources:false }))}
+                        className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-all ${
+                          form[key] ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                        }`}>{label}</button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ═══ SALARIÉ — Étape 1 : Situation ══════════════════════════════ */}
+            {!form.isCandidat && step === 1 && (
+              <div className="grid grid-cols-2 gap-4">
+                <FSec>Situation familiale</FSec>
+                <FSelect label="Situation maritale" highlight={hl("situationMaritale")} value={form.situationMaritale} onChange={e => upd("situationMaritale", e.target.value)}>
+                  <option value="">—</option>
+                  {["Célibataire","En couple","Marié(e)","Divorcé(e)","Veuf/veuve"].map(v => <option key={v}>{v}</option>)}
+                </FSelect>
+                <FInput label="Nb enfants" type="number" min="0" highlight={hl("nbEnfants")} value={form.nbEnfants} onChange={e => upd("nbEnfants", +e.target.value)} />
+                <FSec>Logement &amp; Santé</FSec>
+                <FSelect label="Hébergement" highlight={hl("hebergement")} value={form.hebergement} onChange={e => upd("hebergement", e.target.value)}>
+                  <option value="">—</option>
+                  {["Locataire","Propriétaire","Hébergé (famille)","Hébergé (tiers)","CHRS","SDF","Autre"].map(v => <option key={v}>{v}</option>)}
+                </FSelect>
+                <div>
+                  <FCheck label="CSS / Mutuelle" highlight={hl("css")} checked={form.css} onChange={e => upd("css", e.target.checked)} />
+                  {form.css && <div className="mt-2"><FInput label="Jusqu'au" type="date" highlight={hl("cssJusquau")} value={form.cssJusquau} onChange={e => upd("cssJusquau", e.target.value)} /></div>}
+                </div>
+                <FSec>Ressources</FSec>
+                <FInput label="Revenus (€/mois)" type="number" highlight={hl("revenus")} value={form.revenus} onChange={e => upd("revenus", +e.target.value)} />
+                <FInput label="Charges (€/mois)" type="number" highlight={hl("charges")} value={form.charges} onChange={e => upd("charges", +e.target.value)} />
+              </div>
+            )}
+
+            {/* ═══ SALARIÉ — Étape 2 : Formation & mobilité ═══════════════════ */}
+            {!form.isCandidat && step === 2 && (
+              <div className="grid grid-cols-2 gap-4">
+                <FSec>Formation</FSec>
+                <FSelect label="Niveau de formation" highlight={hl("niveauFormation")} value={form.niveauFormation} onChange={e => upd("niveauFormation", e.target.value)}>
+                  {NIVEAUX.map(n => <option key={n}>{n}</option>)}
+                </FSelect>
+                <FSelect label="Niveau de langue" highlight={hl("niveauLangue")} value={form.niveauLangue} onChange={e => upd("niveauLangue", e.target.value)}>
+                  {NIVEAUX_LANGUE.map(n => <option key={n}>{n}</option>)}
+                </FSelect>
+                <div className="col-span-2 flex gap-6">
+                  <FCheck label="Lecture"  highlight={hl("lecture")}  checked={form.lecture}  onChange={e => upd("lecture",  e.target.checked)} />
+                  <FCheck label="Écriture" highlight={hl("ecriture")} checked={form.ecriture} onChange={e => upd("ecriture", e.target.checked)} />
+                  <FCheck label="Calcul"   highlight={hl("calcul")}   checked={form.calcul}   onChange={e => upd("calcul",   e.target.checked)} />
+                </div>
+                <FInput label="Diplômes" highlight={hl("diplomes")} value={form.diplomes} onChange={e => upd("diplomes", e.target.value)} />
+                <div><FCheck label="CV disponible" highlight={hl("cv")} checked={form.cv} onChange={e => upd("cv", e.target.checked)} /></div>
+                <FSec>Mobilité</FSec>
+                <div className="col-span-2 flex gap-6">
+                  <FCheck label="Permis B"           highlight={hl("permisB")}  checked={form.permisB}  onChange={e => upd("permisB",  e.target.checked)} />
+                  <FCheck label="Véhicule personnel" highlight={hl("vehicule")} checked={form.vehicule} onChange={e => upd("vehicule", e.target.checked)} />
+                </div>
+                <FSelect label="Moyen de transport" highlight={hl("moyenTransport")} value={form.moyenTransport} onChange={e => upd("moyenTransport", e.target.value)}>
+                  <option value="">—</option>
+                  {MOYENS_TRANSPORT.map(m => <option key={m}>{m}</option>)}
+                </FSelect>
+                <FInput label="Zone de déplacement" highlight={hl("deplacements")} value={form.deplacements} onChange={e => upd("deplacements", e.target.value)} />
+              </div>
+            )}
+
+            {/* ═══ SALARIÉ — Étape 3 : Freins & projet ════════════════════════ */}
+            {!form.isCandidat && step === 3 && (
+              <div className="grid grid-cols-2 gap-4">
+                <FSec>Freins à l&apos;entrée</FSec>
+                {hl("freinsEntree") && (
+                  <div className="col-span-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    ↩ Freins récupérés depuis l'ancien passage — vérifiez et mettez à jour si nécessaire.
                   </div>
                 )}
-              </div>
-
-              {/* Orientation — obligatoire si entretien renseigné */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-                  Orientation{form.vuEntretienLe ? " *" : ""}
-                </p>
-                <div className="space-y-2">
-                  {[
-                    { val: "evaluation", label: "Évaluation en cours", sub: "Entretien(s) en cours — décision à venir",          color: "border-orange-300" },
-                    { val: "recrute",    label: "Recruté",              sub: "Intégration en CDDI ID'EES",                        color: "border-green-300"  },
-                    { val: "vivier",     label: "Vivier",               sub: "Profil à rappeler lors d'une prochaine ouverture",   color: "border-blue-300"   },
-                    { val: "decliner",   label: "Décliner",             sub: "Motif à préciser ci-dessous",                       color: "border-red-300"    },
-                  ].map(opt => (
-                    <label key={opt.val} className={`flex items-start gap-3 cursor-pointer p-3 rounded-xl border transition-colors ${form.orientationCandidat === opt.val ? opt.color + " bg-gray-50" : "border-gray-200 hover:" + opt.color}`}>
-                      <input type="radio" name="orientation" value={opt.val}
-                        checked={form.orientationCandidat === opt.val}
-                        onChange={() => upd("orientationCandidat", opt.val)}
-                        className="mt-0.5 accent-indigo-600" />
-                      <div>
-                        <p className="text-sm font-semibold text-gray-800">{opt.label}</p>
-                        <p className="text-xs text-gray-400">{opt.sub}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-                {form.orientationCandidat && form.orientationCandidat !== "recrute" && (
-                  <div className="mt-3">
-                    <FInput
-                      label={
-                        form.orientationCandidat === "decliner"   ? "Motif de déclin" :
-                        form.orientationCandidat === "vivier"     ? "Note vivier" :
-                        form.orientationCandidat === "evaluation" ? "Étape d'évaluation (facultatif)" :
-                        "Précision"
-                      }
-                      value={form.orientationMotif}
-                      onChange={e => upd("orientationMotif", e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Orientation SECTEUR — choix multiples */}
-              <div>
-                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">
-                  Filiale / Activité(s) pressenties{form.vuEntretienLe ? " *" : ""}
-                  <span className="text-gray-400 font-normal normal-case ml-1">— plusieurs choix possibles</span>
-                </p>
-                <ActivitesPrioSelector
-                  sites={sites}
-                  value={form.orientationSiteIds ?? []}
-                  onChange={v => upd("orientationSiteIds", v)}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════
-              RÉSUMÉ — salarié
-          ═══════════════════════════════════════ */}
-          {step === STEPS.length - 1 && !form.isCandidat && (
-            <div className="space-y-4">
-              <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
-                <h3 className="font-semibold text-indigo-900 mb-3">Récapitulatif</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div><span className="text-gray-500">Nom :</span> <strong>{form.nom} {form.prenom}</strong></div>
-                  <div><span className="text-gray-500">Entrée :</span> {fmt(form.dateEntree)}</div>
-                  <div><span className="text-gray-500">Fin contrat :</span> {fmt(form.dateFinContrat)}</div>
-                  <div><span className="text-gray-500">Fin agrément :</span> {fmt(form.dateFinAgrement)}</div>
-                  <div><span className="text-gray-500">N° SS :</span> {form.numSecuSociale || "—"}</div>
-                  <div><span className="text-gray-500">Projet :</span> {form.projetPro || "—"}</div>
-                </div>
-                <div className="flex gap-2 mt-3 flex-wrap">
-                  {form.deld && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">DELD</span>}
-                  {form.brsa && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">BRSA</span>}
-                  {form.th   && <span className="text-xs bg-blue-100  text-blue-700  px-2 py-0.5 rounded-full">TH</span>}
-                  {form.rqth && <span className="text-xs bg-blue-200  text-blue-800  px-2 py-0.5 rounded-full">RQTH</span>}
-                </div>
-              </div>
-              <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
-                <p className="text-sm font-semibold text-amber-900 mb-2">📅 4 entretiens jalons seront planifiés</p>
-                {JALONS_DEF.map(j => (
-                  <div key={j.key} className="text-xs text-amber-700 flex justify-between py-1 border-b border-amber-100 last:border-0">
-                    <span>{j.label}</span>
-                    <span>{fmt(addDays(form.dateEntree, j.offsetDays))}</span>
+                {FREINS.map(f => (
+                  <div key={f}>
+                    <label className="text-xs font-medium text-gray-600 uppercase tracking-wide block mb-1">{f}</label>
+                    <div className="flex gap-1 flex-wrap">
+                      {FREINS_E.map(s => (
+                        <button key={s} onClick={() => updF("freinsEntree", f, form.freinsEntree[f] === s ? "" : s)}
+                          className={`px-2 py-1 rounded-lg text-xs font-medium border ${form.freinsEntree[f] === s ? fC[s] + " border-current" : "bg-gray-50 text-gray-400 border-gray-200"}`}
+                        >{s}</button>
+                      ))}
+                    </div>
                   </div>
                 ))}
-              </div>
-              {!ok && <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-3">⚠ Champs obligatoires manquants (marqués *).</p>}
-              {saveErr && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{saveErr}</p>}
-            </div>
-          )}
-
-          {/* ═══════════════════════════════════════
-              RÉSUMÉ — candidat
-          ═══════════════════════════════════════ */}
-          {step === STEPS.length - 1 && form.isCandidat && (
-            <div className="space-y-4">
-              <div className="p-4 bg-purple-50 rounded-xl border border-purple-100">
-                <h3 className="font-semibold text-purple-900 mb-3">Récapitulatif candidat</h3>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <div><span className="text-gray-500">Nom :</span> <strong>{form.nom} {form.prenom}</strong></div>
-                  <div><span className="text-gray-500">N° SS :</span> {form.numSecuSociale || "—"}</div>
-                  <div><span className="text-gray-500">Candidature :</span> {fmt(form.candidatureRecueLe) || "—"}</div>
-                  <div><span className="text-gray-500">Entretien :</span> {fmt(form.vuEntretienLe) || "—"}</div>
-                  <div><span className="text-gray-500">Impression :</span> {form.impressionGlobale || "—"}</div>
-                  <div><span className="text-gray-500">Orientation :</span> {form.orientationCandidat || "—"}</div>
+                <FSec>Projet professionnel</FSec>
+                <div className="col-span-2">
+                  <FInput label="Projet professionnel" highlight={hl("projetPro")} value={form.projetPro} onChange={e => upd("projetPro", e.target.value)} />
                 </div>
-                {form.activitesPrio.length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Activités prioritaires :</p>
-                    <div className="flex flex-wrap gap-1">
-                      {form.activitesPrio.map(id => {
-                        const s = sites.find(x => x.id === id);
-                        return s ? (
-                          <span key={id} className="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full">
-                            {[s.filiale, s.nom].filter(Boolean).join(" › ")}
-                          </span>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                )}
-                {(form.orientationSiteIds ?? []).length > 0 && (
-                  <div className="mt-2">
-                    <p className="text-xs text-gray-500 mb-1">Sites pressentis :</p>
-                    <div className="flex flex-wrap gap-1">
-                      {(form.orientationSiteIds ?? []).map(id => {
-                        const s = sites.find(x => x.id === id);
-                        return s ? (
-                          <span key={id} className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
-                            {[s.filiale, s.nom].filter(Boolean).join(" › ")}
-                          </span>
-                        ) : null;
-                      })}
-                    </div>
-                  </div>
-                )}
+                {[0, 1, 2].map(i => (
+                  <FSelect key={i} label={`Domaine ${i + 1}`} highlight={hl("domainesPro")} value={form.domainesPro[i] || ""} onChange={e => { const d = [...form.domainesPro]; d[i] = e.target.value; upd("domainesPro", d); }}>
+                    <option value="">—</option>
+                    {DOMAINES_PRO.map(d => <option key={d}>{d}</option>)}
+                  </FSelect>
+                ))}
+                <div className="col-span-2">
+                  <FInput label="Préconisation" highlight={hl("preconisation")} value={form.preconisation} onChange={e => upd("preconisation", e.target.value)} />
+                </div>
+                <div className="col-span-2">
+                  <FTextarea label="Synthèse des besoins à l'entrée" highlight={hl("synthBesoinsEntree")} value={form.synthBesoinsEntree} onChange={e => upd("synthBesoinsEntree", e.target.value)} />
+                </div>
               </div>
-              {!ok && <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-3">⚠ Champs obligatoires manquants (marqués *).</p>}
-              {saveErr && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{saveErr}</p>}
-            </div>
-          )}
-        </div>
+            )}
 
-        {/* ── Navigation ── */}
-        <div className="p-5 border-t border-gray-100 flex justify-between">
-          <button
-            onClick={() => step > 0 ? setStep(s => s - 1) : onClose()}
-            className="px-4 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-100"
-          >
-            {step === 0 ? "Annuler" : "← Précédent"}
-          </button>
-          {step < STEPS.length - 1
-            ? <button onClick={() => setStep(s => s + 1)} className="px-5 py-2 rounded-xl text-sm bg-indigo-600 text-white font-medium">Suivant →</button>
-            : <button
-                onClick={handleSubmit}
-                disabled={!ok || saving}
-                className="px-5 py-2 rounded-xl text-sm bg-green-600 text-white font-medium disabled:opacity-40 flex items-center gap-2"
-              >
-                {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                ✓ Enregistrer
-              </button>
-          }
+            {/* ═══ SALARIÉ — Étape 4 : Résumé salarié ═════════════════════════ */}
+            {!form.isCandidat && step === 4 && (
+              <div className="space-y-4">
+                <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                  <h3 className="font-semibold text-indigo-900 mb-3">Récapitulatif</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div><span className="text-gray-500">Nom :</span> <strong>{form.nom} {form.prenom}</strong></div>
+                    <div><span className="text-gray-500">Entrée :</span> {fmt(form.dateEntree)}</div>
+                    <div><span className="text-gray-500">Fin contrat :</span> {fmt(form.dateFinContrat)}</div>
+                    <div><span className="text-gray-500">Fin agrément :</span> {fmt(form.dateFinAgrement)}</div>
+                    <div><span className="text-gray-500">N° SS :</span> {form.numSecuSociale || "—"}</div>
+                    <div><span className="text-gray-500">Projet :</span> {form.projetPro || "—"}</div>
+                  </div>
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    {form.deld && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">DELD</span>}
+                    {form.brsa && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">BRSA</span>}
+                    {form.th   && <span className="text-xs bg-blue-100  text-blue-700  px-2 py-0.5 rounded-full">TH</span>}
+                    {form.rqth && <span className="text-xs bg-blue-200  text-blue-800  px-2 py-0.5 rounded-full">RQTH</span>}
+                  </div>
+                  {prefillSource && (
+                    <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-200 text-xs text-amber-700">
+                      ↩ Données issues du passage de {prefillSource.prenom} {prefillSource.nom} ({fmt(prefillSource.dateEntree)} → {fmt(prefillSource.dateSortie) || "en cours"})
+                    </div>
+                  )}
+                </div>
+                <div className="p-4 bg-amber-50 rounded-xl border border-amber-100">
+                  <p className="text-sm font-semibold text-amber-900 mb-2">📅 4 entretiens jalons seront planifiés</p>
+                  {JALONS_DEF.map(j => (
+                    <div key={j.key} className="text-xs text-amber-700 flex justify-between py-1 border-b border-amber-100 last:border-0">
+                      <span>{j.label}</span>
+                      <span>{fmt(addDays(form.dateEntree, j.offsetDays))}</span>
+                    </div>
+                  ))}
+                </div>
+                {!ok && <p className="text-sm text-orange-600 bg-orange-50 rounded-xl px-4 py-3">⚠ Champs obligatoires manquants (marqués *).</p>}
+                {secuBlocked && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">🚫 Un salarié actif avec ce numéro de sécurité sociale existe déjà.</p>}
+                {saveErr && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3">{saveErr}</p>}
+              </div>
+            )}
+          </div>
+
+          {/* ── Navigation ── */}
+          <div className="p-5 border-t border-gray-100 flex justify-between">
+            <button
+              onClick={() => step > 0 ? setStep(s => s - 1) : onClose()}
+              className="px-4 py-2 rounded-xl text-sm text-gray-600 hover:bg-gray-100"
+            >
+              {step === 0 ? "Annuler" : "← Précédent"}
+            </button>
+            <div className="flex gap-2">
+              {step < STEPS.length - 1
+                ? <button onClick={() => setStep(s => s + 1)} className="px-5 py-2 rounded-xl text-sm bg-indigo-600 text-white font-medium">Suivant →</button>
+                : <button
+                    onClick={handleSubmit}
+                    disabled={!ok || saving || secuBlocked}
+                    className="px-5 py-2 rounded-xl text-sm bg-green-600 text-white font-medium disabled:opacity-40 flex items-center gap-2"
+                  >
+                    {saving && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                    ✓ Enregistrer
+                  </button>
+              }
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
